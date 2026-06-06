@@ -1,8 +1,11 @@
 #include "pi_donor_runtime_bridge.h"
+#include "pi_donor_host_contracts.h"
 
 int main() {
     pi_port::PiDonorRuntimeBridge bridge;
     const auto& state = bridge.start();
+    pi_port::PiDonorHostContracts contracts;
+    const auto& contract_state = contracts.bind(bridge);
 
     if (!state.adapter.boot.board_ready) {
         return 1;
@@ -38,6 +41,10 @@ int main() {
 
     if (!state.bridge_ready) {
         return 9;
+    }
+
+    if (!contract_state.contracts_ready) {
+        return 10;
     }
 
     return 0;
