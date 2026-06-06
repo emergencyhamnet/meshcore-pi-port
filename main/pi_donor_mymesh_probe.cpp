@@ -35,7 +35,11 @@ namespace {
 
 constexpr std::uint8_t cmd_get_device_time = 5;
 constexpr std::uint8_t cmd_app_start = 1;
+constexpr std::uint8_t cmd_get_contacts = 4;
 constexpr std::uint8_t cmd_device_query = 22;
+constexpr std::uint8_t resp_code_contacts_start = 2;
+constexpr std::uint8_t resp_code_contact = 3;
+constexpr std::uint8_t resp_code_end_of_contacts = 4;
 constexpr std::uint8_t resp_code_curr_time = 9;
 constexpr std::uint8_t resp_code_self_info = 5;
 constexpr std::uint8_t resp_code_device_info = 13;
@@ -58,10 +62,18 @@ constexpr std::uint32_t expected_bw_khz = 250000U;
 constexpr std::uint8_t expected_sf = 9;
 constexpr std::uint8_t expected_cr = 5;
 constexpr std::int8_t expected_tx_power_dbm = 17;
+constexpr std::uint8_t expected_contact_type = 1;
+constexpr std::uint8_t expected_contact_flags = 3;
+constexpr std::uint8_t expected_contact_out_path_len = 4;
+constexpr std::uint32_t expected_contact_last_advert_timestamp = 123456U;
+constexpr std::uint32_t expected_contact_lastmod = 654321U;
+constexpr std::int32_t expected_contact_gps_lat = 51507400;
+constexpr std::int32_t expected_contact_gps_lon = -127800;
 constexpr char expected_build_date[] = "6 Jun 2026";
 constexpr char expected_manufacturer[] = "PiProbe";
 constexpr char expected_firmware_version[] = "v1.16.0";
 constexpr char expected_node_name[] = "pi-port-probe";
+constexpr char expected_contact_name[] = "probe-contact";
 
 bool matches_device_time_reply(const std::vector<std::uint8_t>& bytes, std::size_t start, std::uint32_t expected_time) {
     if (bytes.size() < start + 8) {
@@ -206,6 +218,86 @@ bool matches_app_start_reply(const std::vector<std::uint8_t>& bytes, std::size_t
     return std::strncmp(reinterpret_cast<const char*>(&payload[58]), expected_node_name, sizeof(expected_node_name) - 1) == 0;
 }
 
+bool matches_contacts_reply_sequence(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    constexpr std::size_t start_frame_size = 8;
+    constexpr std::size_t contact_payload_len = 148;
+    constexpr std::size_t contact_frame_size = 3 + contact_payload_len;
+    constexpr std::size_t end_frame_size = 8;
+
+    if (bytes.size() < start + start_frame_size + contact_frame_size + end_frame_size) {
+        return false;
+    }
+
+    const auto read_u16 = [&bytes](std::size_t offset) {
+        return static_cast<std::uint16_t>(bytes[offset])
+            | (static_cast<std::uint16_t>(bytes[offset + 1]) << 8);
+    };
+    const auto read_u32 = [&bytes](std::size_t offset) {
+        return static_cast<std::uint32_t>(bytes[offset])
+            | (static_cast<std::uint32_t>(bytes[offset + 1]) << 8)
+            | (static_cast<std::uint32_t>(bytes[offset + 2]) << 16)
+            | (static_cast<std::uint32_t>(bytes[offset + 3]) << 24);
+    };
+    const auto read_i32 = [&read_u32](std::size_t offset) {
+        return static_cast<std::int32_t>(read_u32(offset));
+    };
+
+    if (bytes[start] != '>' || read_u16(start + 1) != 5 || bytes[start + 3] != resp_code_contacts_start) {
+        return false;
+    }
+    if (read_u32(start + 4) != 1U) {
+        return false;
+    }
+
+    const auto contact_start = start + start_frame_size;
+    if (bytes[contact_start] != '>' || read_u16(contact_start + 1) != contact_payload_len) {
+        return false;
+    }
+
+    const auto* payload = &bytes[contact_start + 3];
+    if (payload[0] != resp_code_contact) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < PUB_KEY_SIZE; ++index) {
+        if (payload[1 + index] != static_cast<std::uint8_t>(index + 16U)) {
+            return false;
+        }
+    }
+
+    if (payload[33] != expected_contact_type
+        || payload[34] != expected_contact_flags
+        || payload[35] != expected_contact_out_path_len) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < MAX_PATH_SIZE; ++index) {
+        const auto expected_path = index < expected_contact_out_path_len
+            ? static_cast<std::uint8_t>(index + 1U)
+            : 0U;
+        if (payload[36 + index] != expected_path) {
+            return false;
+        }
+    }
+
+    if (std::strncmp(reinterpret_cast<const char*>(&payload[100]), expected_contact_name, sizeof(expected_contact_name) - 1) != 0) {
+        return false;
+    }
+
+    if (read_u32(contact_start + 135) != expected_contact_last_advert_timestamp
+        || read_i32(contact_start + 139) != expected_contact_gps_lat
+        || read_i32(contact_start + 143) != expected_contact_gps_lon
+        || read_u32(contact_start + 147) != expected_contact_lastmod) {
+        return false;
+    }
+
+    const auto end_start = contact_start + contact_frame_size;
+    if (bytes[end_start] != '>' || read_u16(end_start + 1) != 5 || bytes[end_start + 3] != resp_code_end_of_contacts) {
+        return false;
+    }
+    return read_u32(end_start + 4) == expected_contact_lastmod;
+}
+
 } // namespace
 
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
@@ -299,6 +391,18 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.app_start_reply_ready = final_tx_bytes.size() >= before_app_start_tx_size + 74;
         state_.app_start_reply_valid = state_.app_start_reply_ready
             && matches_app_start_reply(final_tx_bytes, before_app_start_tx_size);
+
+        const auto before_contacts_tx_size = final_tx_bytes.size();
+        const std::uint8_t get_contacts_frame[] = { '<', 1, 0, cmd_get_contacts };
+        bridge.adapter().transport().inject_rx_bytes(get_contacts_frame, sizeof(get_contacts_frame));
+        mesh_->loop();
+        mesh_->loop();
+        mesh_->loop();
+
+        const auto& contacts_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.contacts_reply_ready = contacts_tx_bytes.size() >= before_contacts_tx_size + 167;
+        state_.contacts_reply_valid = state_.contacts_reply_ready
+            && matches_contacts_reply_sequence(contacts_tx_bytes, before_contacts_tx_size);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -314,7 +418,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.device_query_reply_ready
         && state_.device_query_reply_valid
         && state_.app_start_reply_ready
-        && state_.app_start_reply_valid;
+        && state_.app_start_reply_valid
+        && state_.contacts_reply_ready
+        && state_.contacts_reply_valid;
     return state_;
 }
 
