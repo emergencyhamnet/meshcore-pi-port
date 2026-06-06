@@ -34,18 +34,34 @@ namespace pi_port {
 namespace {
 
 constexpr std::uint8_t cmd_get_device_time = 5;
+constexpr std::uint8_t cmd_app_start = 1;
 constexpr std::uint8_t cmd_device_query = 22;
 constexpr std::uint8_t resp_code_curr_time = 9;
+constexpr std::uint8_t resp_code_self_info = 5;
 constexpr std::uint8_t resp_code_device_info = 13;
+constexpr std::uint8_t expected_adv_type_chat = 1;
 constexpr std::uint8_t expected_firmware_ver_code = 13;
 constexpr std::uint8_t expected_contact_slots = 50;
 constexpr std::uint8_t expected_group_channels = 40;
+constexpr std::uint8_t expected_max_lora_tx_power = 20;
 constexpr std::uint32_t expected_ble_pin = 123456U;
+constexpr std::int32_t expected_latitude_e6 = 51507400;
+constexpr std::int32_t expected_longitude_e6 = -127800;
 constexpr std::uint8_t expected_client_repeat = 2;
 constexpr std::uint8_t expected_path_hash_mode = 1;
+constexpr std::uint8_t expected_multi_acks = 1;
+constexpr std::uint8_t expected_advert_loc_policy = 1;
+constexpr std::uint8_t expected_telemetry_mode = 6;
+constexpr std::uint8_t expected_manual_add_contacts = 1;
+constexpr std::uint32_t expected_freq_khz = 915500U;
+constexpr std::uint32_t expected_bw_khz = 250000U;
+constexpr std::uint8_t expected_sf = 9;
+constexpr std::uint8_t expected_cr = 5;
+constexpr std::int8_t expected_tx_power_dbm = 17;
 constexpr char expected_build_date[] = "6 Jun 2026";
 constexpr char expected_manufacturer[] = "PiProbe";
 constexpr char expected_firmware_version[] = "v1.16.0";
+constexpr char expected_node_name[] = "pi-port-probe";
 
 bool matches_device_time_reply(const std::vector<std::uint8_t>& bytes, std::size_t start, std::uint32_t expected_time) {
     if (bytes.size() < start + 8) {
@@ -118,6 +134,76 @@ bool matches_device_query_reply(const std::vector<std::uint8_t>& bytes, std::siz
 
     return payload[80] == expected_client_repeat
         && payload[81] == expected_path_hash_mode;
+}
+
+bool matches_app_start_reply(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    constexpr std::size_t expected_payload_len = 71;
+    if (bytes.size() < start + 3 + expected_payload_len) {
+        return false;
+    }
+
+    if (bytes[start] != '>') {
+        return false;
+    }
+
+    const auto payload_len = static_cast<std::uint16_t>(bytes[start + 1])
+        | (static_cast<std::uint16_t>(bytes[start + 2]) << 8);
+    if (payload_len != expected_payload_len) {
+        return false;
+    }
+
+    const auto* payload = &bytes[start + 3];
+    if (payload[0] != resp_code_self_info
+        || payload[1] != expected_adv_type_chat
+        || payload[2] != static_cast<std::uint8_t>(expected_tx_power_dbm)
+        || payload[3] != expected_max_lora_tx_power) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < PUB_KEY_SIZE; ++index) {
+        if (payload[4 + index] != 0) {
+            return false;
+        }
+    }
+
+    const auto observed_latitude = static_cast<std::int32_t>(
+        static_cast<std::uint32_t>(payload[36])
+        | (static_cast<std::uint32_t>(payload[37]) << 8)
+        | (static_cast<std::uint32_t>(payload[38]) << 16)
+        | (static_cast<std::uint32_t>(payload[39]) << 24));
+    const auto observed_longitude = static_cast<std::int32_t>(
+        static_cast<std::uint32_t>(payload[40])
+        | (static_cast<std::uint32_t>(payload[41]) << 8)
+        | (static_cast<std::uint32_t>(payload[42]) << 16)
+        | (static_cast<std::uint32_t>(payload[43]) << 24));
+    if (observed_latitude != expected_latitude_e6 || observed_longitude != expected_longitude_e6) {
+        return false;
+    }
+
+    if (payload[44] != expected_multi_acks
+        || payload[45] != expected_advert_loc_policy
+        || payload[46] != expected_telemetry_mode
+        || payload[47] != expected_manual_add_contacts) {
+        return false;
+    }
+
+    const auto observed_freq = static_cast<std::uint32_t>(payload[48])
+        | (static_cast<std::uint32_t>(payload[49]) << 8)
+        | (static_cast<std::uint32_t>(payload[50]) << 16)
+        | (static_cast<std::uint32_t>(payload[51]) << 24);
+    const auto observed_bw = static_cast<std::uint32_t>(payload[52])
+        | (static_cast<std::uint32_t>(payload[53]) << 8)
+        | (static_cast<std::uint32_t>(payload[54]) << 16)
+        | (static_cast<std::uint32_t>(payload[55]) << 24);
+    if (observed_freq != expected_freq_khz || observed_bw != expected_bw_khz) {
+        return false;
+    }
+
+    if (payload[56] != expected_sf || payload[57] != expected_cr) {
+        return false;
+    }
+
+    return std::strncmp(reinterpret_cast<const char*>(&payload[58]), expected_node_name, sizeof(expected_node_name) - 1) == 0;
 }
 
 } // namespace
@@ -203,6 +289,16 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.device_query_reply_ready = updated_tx_bytes.size() >= before_device_query_tx_size + 85;
         state_.device_query_reply_valid = state_.device_query_reply_ready
             && matches_device_query_reply(updated_tx_bytes, before_device_query_tx_size);
+
+        const auto before_app_start_tx_size = updated_tx_bytes.size();
+        const std::uint8_t app_start_frame[] = { '<', 8, 0, cmd_app_start, 0, 0, 0, 0, 0, 0, 0 };
+        bridge.adapter().transport().inject_rx_bytes(app_start_frame, sizeof(app_start_frame));
+        mesh_->loop();
+
+        const auto& final_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.app_start_reply_ready = final_tx_bytes.size() >= before_app_start_tx_size + 74;
+        state_.app_start_reply_valid = state_.app_start_reply_ready
+            && matches_app_start_reply(final_tx_bytes, before_app_start_tx_size);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -216,7 +312,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.device_time_reply_ready
         && state_.device_time_reply_valid
         && state_.device_query_reply_ready
-        && state_.device_query_reply_valid;
+        && state_.device_query_reply_valid
+        && state_.app_start_reply_ready
+        && state_.app_start_reply_valid;
     return state_;
 }
 
