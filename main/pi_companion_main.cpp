@@ -1,26 +1,25 @@
-#include "../platform/pi_board.h"
-#include "../platform/pi_gpio.h"
-#include "../platform/pi_spi.h"
-#include "../platform/pi_storage.h"
+#include "pi_runtime_boot.h"
 
 int main() {
-    if (!pi_port::board_bootstrap()) {
+    const auto state = pi_port::boot_runtime_state();
+
+    if (!state.board_ready) {
         return 1;
     }
 
-    if (!pi_port::gpio_init()) {
+    if (!state.gpio_ready) {
         return 2;
     }
 
-    if (!pi_port::spi_init()) {
+    if (!state.spi_ready) {
         return 3;
     }
 
-    if (!pi_port::board_set_radio_path_mode(pi_port::RadioPathMode::standby)) {
+    if (!state.radio_path_ready) {
         return 4;
     }
 
-    if (!pi_port::storage_init()) {
+    if (!state.storage_ready) {
         return 5;
     }
 
