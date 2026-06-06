@@ -16,8 +16,12 @@ int main() {
         return 3;
     }
 
-    if (!pi_port::storage_init()) {
+    if (!pi_port::board_set_radio_path_mode(pi_port::RadioPathMode::standby)) {
         return 4;
+    }
+
+    if (!pi_port::storage_init()) {
+        return 5;
     }
 
     return 0;
