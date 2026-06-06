@@ -21,15 +21,32 @@ struct DonorDataStoreProbeState {
     bool prefs_file_ready;
     bool prefs_loaded;
     bool prefs_roundtrip_ok;
+    bool contacts_saved;
+    bool contacts_file_ready;
+    bool contacts_loaded;
+    bool contacts_roundtrip_ok;
     bool probe_ready;
 };
 
 class PiDonorDataStoreHost final : public DataStoreHost {
 public:
+    PiDonorDataStoreHost();
+
+    void set_probe_contact(const ContactInfo& contact);
+    void reset_loaded_contact();
+    bool has_loaded_contact() const;
+    const ContactInfo& loaded_contact() const;
+
     bool onContactLoaded(const ContactInfo& contact) override;
     bool getContactForSave(uint32_t idx, ContactInfo& contact) override;
     bool onChannelLoaded(uint8_t channel_idx, const ChannelDetails& ch) override;
     bool getChannelForSave(uint8_t channel_idx, ChannelDetails& ch) override;
+
+private:
+    ContactInfo probe_contact_;
+    ContactInfo loaded_contact_;
+    bool probe_contact_ready_;
+    bool loaded_contact_ready_;
 };
 
 class PiDonorDataStoreProbe {

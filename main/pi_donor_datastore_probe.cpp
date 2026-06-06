@@ -66,14 +66,83 @@ bool prefs_equal(const NodePrefs& left, const NodePrefs& right) {
         && std::memcmp(left.default_scope_key, right.default_scope_key, sizeof(left.default_scope_key)) == 0;
 }
 
-} // namespace
-
-bool PiDonorDataStoreHost::onContactLoaded(const ContactInfo&) {
-    return true;
+ContactInfo build_probe_contact() {
+    ContactInfo contact{};
+    std::uint8_t pub_key[PUB_KEY_SIZE]{};
+    for (std::size_t index = 0; index < PUB_KEY_SIZE; ++index) {
+        pub_key[index] = static_cast<std::uint8_t>(index + 16U);
+    }
+    contact.id = mesh::Identity(pub_key);
+    std::strcpy(contact.name, "probe-contact");
+    contact.type = 1;
+    contact.flags = 3;
+    contact.out_path_len = 4;
+    contact.shared_secret_valid = false;
+    for (std::size_t index = 0; index < MAX_PATH_SIZE; ++index) {
+        contact.out_path[index] = index < contact.out_path_len
+            ? static_cast<std::uint8_t>(index + 1U)
+            : 0U;
+    }
+    contact.last_advert_timestamp = 123456U;
+    contact.lastmod = 654321U;
+    contact.gps_lat = 51507400;
+    contact.gps_lon = -127800;
+    contact.sync_since = 42U;
+    return contact;
 }
 
-bool PiDonorDataStoreHost::getContactForSave(uint32_t, ContactInfo&) {
+bool contacts_equal(const ContactInfo& left, const ContactInfo& right) {
+    return std::memcmp(left.id.pub_key, right.id.pub_key, PUB_KEY_SIZE) == 0
+        && std::memcmp(left.name, right.name, sizeof(left.name)) == 0
+        && left.type == right.type
+        && left.flags == right.flags
+        && left.out_path_len == right.out_path_len
+        && std::memcmp(left.out_path, right.out_path, MAX_PATH_SIZE) == 0
+        && left.last_advert_timestamp == right.last_advert_timestamp
+        && left.lastmod == right.lastmod
+        && left.gps_lat == right.gps_lat
+        && left.gps_lon == right.gps_lon
+        && left.sync_since == right.sync_since;
+}
+
+} // namespace
+
+PiDonorDataStoreHost::PiDonorDataStoreHost()
+    : probe_contact_{},
+      loaded_contact_{},
+      probe_contact_ready_(false),
+      loaded_contact_ready_(false) {}
+
+void PiDonorDataStoreHost::set_probe_contact(const ContactInfo& contact) {
+    probe_contact_ = contact;
+    probe_contact_ready_ = true;
+}
+
+void PiDonorDataStoreHost::reset_loaded_contact() {
+    loaded_contact_ = {};
+    loaded_contact_ready_ = false;
+}
+
+bool PiDonorDataStoreHost::has_loaded_contact() const {
+    return loaded_contact_ready_;
+}
+
+const ContactInfo& PiDonorDataStoreHost::loaded_contact() const {
+    return loaded_contact_;
+}
+
+bool PiDonorDataStoreHost::onContactLoaded(const ContactInfo& contact) {
+    loaded_contact_ = contact;
+    loaded_contact_ready_ = true;
     return false;
+}
+
+bool PiDonorDataStoreHost::getContactForSave(uint32_t idx, ContactInfo& contact) {
+    if (!probe_contact_ready_ || idx != 0) {
+        return false;
+    }
+    contact = probe_contact_;
+    return true;
 }
 
 bool PiDonorDataStoreHost::onChannelLoaded(uint8_t, const ChannelDetails&) {
@@ -140,6 +209,21 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
         state_.prefs_roundtrip_ok = prefs_equal(saved_prefs, loaded_prefs)
             && loaded_latitude == saved_latitude
             && loaded_longitude == saved_longitude;
+
+        auto* contacts_fs = secondary_fs != nullptr ? secondary_fs : &contracts.donor_primary_filesystem();
+        contacts_fs->remove("/contacts3");
+
+        const ContactInfo saved_contact = build_probe_contact();
+        host_.set_probe_contact(saved_contact);
+        host_.reset_loaded_contact();
+
+        datastore_->saveContacts(&host_);
+        state_.contacts_saved = contacts_fs->exists("/contacts3");
+        state_.contacts_file_ready = state_.contacts_saved;
+        datastore_->loadContacts(&host_);
+        state_.contacts_loaded = host_.has_loaded_contact();
+        state_.contacts_roundtrip_ok = state_.contacts_loaded
+            && contacts_equal(saved_contact, host_.loaded_contact());
     }
 
     state_.probe_ready = state_.datastore_host_ready
@@ -153,7 +237,11 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
         && state_.prefs_saved
         && state_.prefs_file_ready
         && state_.prefs_loaded
-        && state_.prefs_roundtrip_ok;
+        && state_.prefs_roundtrip_ok
+        && state_.contacts_saved
+        && state_.contacts_file_ready
+        && state_.contacts_loaded
+        && state_.contacts_roundtrip_ok;
     return state_;
 }
 
