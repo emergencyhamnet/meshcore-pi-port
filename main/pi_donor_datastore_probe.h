@@ -13,6 +13,10 @@ struct DonorDataStoreProbeState {
     bool using_secondary_filesystem;
     bool begin_called;
     bool blob_store_ready;
+    bool identity_missing_before_save;
+    bool identity_saved;
+    bool identity_file_ready;
+    bool identity_loaded_after_save;
     bool probe_ready;
 };
 

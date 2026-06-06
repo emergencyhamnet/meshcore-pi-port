@@ -45,12 +45,26 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
         datastore_->begin();
         state_.begin_called = true;
         state_.blob_store_ready = contracts.donor_primary_filesystem().exists("/bl");
+
+        contracts.donor_primary_filesystem().remove("/identity/_main.id");
+
+        mesh::LocalIdentity saved_identity;
+        mesh::LocalIdentity loaded_identity;
+
+        state_.identity_missing_before_save = !datastore_->loadMainIdentity(loaded_identity);
+        state_.identity_saved = datastore_->saveMainIdentity(saved_identity);
+        state_.identity_file_ready = contracts.donor_primary_filesystem().exists("/identity/_main.id");
+        state_.identity_loaded_after_save = datastore_->loadMainIdentity(loaded_identity);
     }
 
     state_.probe_ready = state_.datastore_host_ready
         && state_.datastore_constructed
         && state_.begin_called
-        && state_.blob_store_ready;
+        && state_.blob_store_ready
+        && state_.identity_missing_before_save
+        && state_.identity_saved
+        && state_.identity_file_ready
+        && state_.identity_loaded_after_save;
     return state_;
 }
 
