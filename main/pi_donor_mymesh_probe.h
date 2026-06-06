@@ -18,6 +18,8 @@ struct DonorMyMeshProbeState {
     bool command_loop_called;
     bool device_time_reply_ready;
     bool device_time_reply_valid;
+    bool device_query_reply_ready;
+    bool device_query_reply_valid;
     bool probe_ready;
 };
 
