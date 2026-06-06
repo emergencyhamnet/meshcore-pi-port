@@ -36,6 +36,7 @@ namespace {
 constexpr std::uint8_t cmd_get_device_time = 5;
 constexpr std::uint8_t cmd_app_start = 1;
 constexpr std::uint8_t cmd_get_contacts = 4;
+constexpr std::uint8_t cmd_get_channel = 31;
 constexpr std::uint8_t cmd_device_query = 22;
 constexpr std::uint8_t resp_code_contacts_start = 2;
 constexpr std::uint8_t resp_code_contact = 3;
@@ -44,6 +45,7 @@ constexpr std::uint8_t resp_code_err = 1;
 constexpr std::uint8_t resp_code_curr_time = 9;
 constexpr std::uint8_t resp_code_self_info = 5;
 constexpr std::uint8_t resp_code_device_info = 13;
+constexpr std::uint8_t resp_code_channel_info = 18;
 constexpr std::uint8_t expected_adv_type_chat = 1;
 constexpr std::uint8_t expected_firmware_ver_code = 13;
 constexpr std::uint8_t expected_contact_slots = 50;
@@ -71,11 +73,13 @@ constexpr std::uint32_t expected_contact_last_advert_timestamp = 123456U;
 constexpr std::uint32_t expected_contact_lastmod = 654321U;
 constexpr std::int32_t expected_contact_gps_lat = 51507400;
 constexpr std::int32_t expected_contact_gps_lon = -127800;
+constexpr std::uint8_t expected_channel_index = 0;
 constexpr char expected_build_date[] = "6 Jun 2026";
 constexpr char expected_manufacturer[] = "PiProbe";
 constexpr char expected_firmware_version[] = "v1.16.0";
 constexpr char expected_node_name[] = "pi-port-probe";
 constexpr char expected_contact_name[] = "probe-contact";
+constexpr char expected_channel_name[] = "ops-room";
 
 bool matches_device_time_reply(const std::vector<std::uint8_t>& bytes, std::size_t start, std::uint32_t expected_time) {
     if (bytes.size() < start + 8) {
@@ -345,6 +349,40 @@ bool matches_contacts_busy_reply(const std::vector<std::uint8_t>& bytes, std::si
         && bytes[start + 4] == expected_err_code_bad_state;
 }
 
+bool matches_channel_reply(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    constexpr std::size_t expected_payload_len = 50;
+    if (bytes.size() < start + 3 + expected_payload_len) {
+        return false;
+    }
+
+    if (bytes[start] != '>') {
+        return false;
+    }
+
+    const auto payload_len = static_cast<std::uint16_t>(bytes[start + 1])
+        | (static_cast<std::uint16_t>(bytes[start + 2]) << 8);
+    if (payload_len != expected_payload_len) {
+        return false;
+    }
+
+    const auto* payload = &bytes[start + 3];
+    if (payload[0] != resp_code_channel_info || payload[1] != expected_channel_index) {
+        return false;
+    }
+
+    if (std::strncmp(reinterpret_cast<const char*>(&payload[2]), expected_channel_name, sizeof(expected_channel_name) - 1) != 0) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < 16; ++index) {
+        if (payload[34 + index] != static_cast<std::uint8_t>(index + 32U)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 } // namespace
 
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
@@ -485,6 +523,16 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.contacts_since_reply_ready = contacts_since_tx_bytes.size() >= before_contacts_since_tx_size + 16;
         state_.contacts_since_reply_valid = state_.contacts_since_reply_ready
             && matches_contacts_since_reply_sequence(contacts_since_tx_bytes, before_contacts_since_tx_size);
+
+        const auto before_channel_tx_size = contacts_since_tx_bytes.size();
+        const std::uint8_t get_channel_frame[] = { '<', 2, 0, cmd_get_channel, expected_channel_index };
+        bridge.adapter().transport().inject_rx_bytes(get_channel_frame, sizeof(get_channel_frame));
+        mesh_->loop();
+
+        const auto& channel_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.channel_reply_ready = channel_tx_bytes.size() >= before_channel_tx_size + 53;
+        state_.channel_reply_valid = state_.channel_reply_ready
+            && matches_channel_reply(channel_tx_bytes, before_channel_tx_size);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -506,7 +554,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.contacts_reply_ready
         && state_.contacts_reply_valid
         && state_.contacts_since_reply_ready
-        && state_.contacts_since_reply_valid;
+        && state_.contacts_since_reply_valid
+        && state_.channel_reply_ready
+        && state_.channel_reply_valid;
     return state_;
 }
 
