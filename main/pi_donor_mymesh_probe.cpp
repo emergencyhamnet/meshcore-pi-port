@@ -74,6 +74,7 @@ constexpr std::uint32_t expected_contact_lastmod = 654321U;
 constexpr std::int32_t expected_contact_gps_lat = 51507400;
 constexpr std::int32_t expected_contact_gps_lon = -127800;
 constexpr std::uint8_t expected_channel_index = 0;
+constexpr std::uint8_t expected_missing_channel_index = 1;
 constexpr char expected_build_date[] = "6 Jun 2026";
 constexpr char expected_manufacturer[] = "PiProbe";
 constexpr char expected_firmware_version[] = "v1.16.0";
@@ -383,6 +384,19 @@ bool matches_channel_reply(const std::vector<std::uint8_t>& bytes, std::size_t s
     return true;
 }
 
+bool matches_channel_missing_reply(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    if (bytes.size() < start + 5) {
+        return false;
+    }
+
+    const auto payload_len = static_cast<std::uint16_t>(bytes[start + 1])
+        | (static_cast<std::uint16_t>(bytes[start + 2]) << 8);
+    return bytes[start] == '>'
+        && payload_len == 2
+        && bytes[start + 3] == resp_code_err
+        && bytes[start + 4] == 2;
+}
+
 } // namespace
 
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
@@ -533,6 +547,16 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.channel_reply_ready = channel_tx_bytes.size() >= before_channel_tx_size + 53;
         state_.channel_reply_valid = state_.channel_reply_ready
             && matches_channel_reply(channel_tx_bytes, before_channel_tx_size);
+
+        const auto before_missing_channel_tx_size = channel_tx_bytes.size();
+        const std::uint8_t missing_channel_frame[] = { '<', 2, 0, cmd_get_channel, expected_missing_channel_index };
+        bridge.adapter().transport().inject_rx_bytes(missing_channel_frame, sizeof(missing_channel_frame));
+        mesh_->loop();
+
+        const auto& missing_channel_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.channel_missing_reply_ready = missing_channel_tx_bytes.size() >= before_missing_channel_tx_size + 5;
+        state_.channel_missing_reply_valid = state_.channel_missing_reply_ready
+            && matches_channel_missing_reply(missing_channel_tx_bytes, before_missing_channel_tx_size);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -556,7 +580,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.contacts_since_reply_ready
         && state_.contacts_since_reply_valid
         && state_.channel_reply_ready
-        && state_.channel_reply_valid;
+        && state_.channel_reply_valid
+        && state_.channel_missing_reply_ready
+        && state_.channel_missing_reply_valid;
     return state_;
 }
 

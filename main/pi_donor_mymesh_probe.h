@@ -30,6 +30,8 @@ struct DonorMyMeshProbeState {
     bool contacts_since_reply_valid;
     bool channel_reply_ready;
     bool channel_reply_valid;
+    bool channel_missing_reply_ready;
+    bool channel_missing_reply_valid;
     bool probe_ready;
 };
 
