@@ -1,6 +1,7 @@
 #include "pi_donor_runtime_bridge.h"
 #include "pi_donor_host_contracts.h"
 #include "pi_donor_datastore_probe.h"
+#include "pi_donor_mymesh_probe.h"
 
 int main() {
     pi_port::PiDonorRuntimeBridge bridge;
@@ -9,6 +10,8 @@ int main() {
     const auto& contract_state = contracts.bind(bridge);
     pi_port::PiDonorDataStoreProbe datastore_probe;
     const auto& datastore_state = datastore_probe.bind(contracts);
+    pi_port::PiDonorMyMeshProbe mymesh_probe;
+    const auto& mymesh_state = mymesh_probe.bind(contracts, datastore_probe);
 
     if (!state.adapter.boot.board_ready) {
         return 1;
@@ -52,6 +55,10 @@ int main() {
 
     if (!datastore_state.probe_ready) {
         return 11;
+    }
+
+    if (!mymesh_state.probe_ready) {
+        return 12;
     }
 
     return 0;
