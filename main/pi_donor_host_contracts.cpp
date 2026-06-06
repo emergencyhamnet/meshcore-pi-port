@@ -5,6 +5,45 @@
 
 namespace pi_port {
 
+PiDonorSerialInterfaceAdapter::PiDonorSerialInterfaceAdapter()
+    : serial_host_(nullptr) {}
+
+void PiDonorSerialInterfaceAdapter::bind(DonorSerialHost& serial_host) {
+    serial_host_ = &serial_host;
+}
+
+void PiDonorSerialInterfaceAdapter::enable() {
+    if (serial_host_ != nullptr) {
+        serial_host_->enable();
+    }
+}
+
+void PiDonorSerialInterfaceAdapter::disable() {
+    if (serial_host_ != nullptr) {
+        serial_host_->disable();
+    }
+}
+
+bool PiDonorSerialInterfaceAdapter::isEnabled() const {
+    return serial_host_ != nullptr && serial_host_->is_enabled();
+}
+
+bool PiDonorSerialInterfaceAdapter::isConnected() const {
+    return serial_host_ != nullptr && serial_host_->is_connected();
+}
+
+bool PiDonorSerialInterfaceAdapter::isWriteBusy() const {
+    return serial_host_ != nullptr && serial_host_->is_write_busy();
+}
+
+size_t PiDonorSerialInterfaceAdapter::writeFrame(const uint8_t src[], size_t len) {
+    return serial_host_ == nullptr ? 0 : serial_host_->write_frame(src, len);
+}
+
+size_t PiDonorSerialInterfaceAdapter::checkRecvFrame(uint8_t dest[]) {
+    return serial_host_ == nullptr ? 0 : serial_host_->check_recv_frame(dest);
+}
+
 PiBoardHost::PiBoardHost()
     : boot_state_(nullptr) {}
 
@@ -62,6 +101,22 @@ bool PiSerialHost::is_ready() const {
     return transport_ != nullptr && transport_->is_enabled() && transport_->is_connected();
 }
 
+void PiSerialHost::enable() {
+    if (transport_ != nullptr) {
+        transport_->enable();
+    }
+}
+
+void PiSerialHost::disable() {
+    if (transport_ != nullptr) {
+        transport_->disable();
+    }
+}
+
+bool PiSerialHost::is_enabled() const {
+    return transport_ != nullptr && transport_->is_enabled();
+}
+
 bool PiSerialHost::is_connected() const {
     return transport_ != nullptr && transport_->is_connected();
 }
@@ -82,7 +137,8 @@ PiDonorHostContracts::PiDonorHostContracts()
     : state_{},
     board_host_impl_(),
     storage_host_impl_(),
-    serial_host_impl_() {}
+    serial_host_impl_(),
+    donor_serial_interface_impl_() {}
 
 const DonorHostContractsState& PiDonorHostContracts::bind(PiDonorRuntimeBridge& bridge) {
     state_ = {};
@@ -92,11 +148,13 @@ const DonorHostContractsState& PiDonorHostContracts::bind(PiDonorRuntimeBridge& 
     board_host_impl_.bind(bridge_state.adapter.boot);
     storage_host_impl_.bind(bridge_state.adapter.boot);
     serial_host_impl_.bind(bridge.adapter().transport());
+    donor_serial_interface_impl_.bind(serial_host_impl_);
 
     state_.board_bound = board_host_impl_.is_ready();
     state_.storage_bound = storage_host_impl_.is_ready();
     state_.serial_bound = serial_host_impl_.is_ready();
-    state_.contracts_ready = state_.board_bound && state_.storage_bound && state_.serial_bound;
+    state_.donor_serial_interface_bound = true;
+    state_.contracts_ready = state_.board_bound && state_.storage_bound && state_.serial_bound && state_.donor_serial_interface_bound;
     return state_;
 }
 
@@ -114,6 +172,10 @@ DonorStorageHost& PiDonorHostContracts::storage_host() {
 
 DonorSerialHost& PiDonorHostContracts::serial_host() {
     return serial_host_impl_;
+}
+
+BaseSerialInterface& PiDonorHostContracts::donor_serial_interface() {
+    return donor_serial_interface_impl_;
 }
 
 } // namespace pi_port

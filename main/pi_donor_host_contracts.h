@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "../src/helpers/BaseSerialInterface.h"
 #include "pi_donor_runtime_bridge.h"
 
 namespace pi_port {
@@ -30,16 +31,37 @@ class DonorSerialHost {
 public:
     virtual ~DonorSerialHost() = default;
     virtual bool is_ready() const = 0;
+    virtual void enable() = 0;
+    virtual void disable() = 0;
+    virtual bool is_enabled() const = 0;
     virtual bool is_connected() const = 0;
     virtual bool is_write_busy() const = 0;
     virtual std::size_t write_frame(const std::uint8_t src[], std::size_t len) = 0;
     virtual std::size_t check_recv_frame(std::uint8_t dest[]) = 0;
 };
 
+class PiDonorSerialInterfaceAdapter final : public BaseSerialInterface {
+public:
+    PiDonorSerialInterfaceAdapter();
+    void bind(DonorSerialHost& serial_host);
+
+    void enable() override;
+    void disable() override;
+    bool isEnabled() const override;
+    bool isConnected() const override;
+    bool isWriteBusy() const override;
+    size_t writeFrame(const uint8_t src[], size_t len) override;
+    size_t checkRecvFrame(uint8_t dest[]) override;
+
+private:
+    DonorSerialHost* serial_host_;
+};
+
 struct DonorHostContractsState {
     bool board_bound;
     bool storage_bound;
     bool serial_bound;
+    bool donor_serial_interface_bound;
     bool contracts_ready;
 };
 
@@ -77,6 +99,9 @@ public:
     void bind(PiTransportInterface& transport);
 
     bool is_ready() const override;
+    void enable() override;
+    void disable() override;
+    bool is_enabled() const override;
     bool is_connected() const override;
     bool is_write_busy() const override;
     std::size_t write_frame(const std::uint8_t src[], std::size_t len) override;
@@ -95,12 +120,14 @@ public:
     DonorBoardHost& board_host();
     DonorStorageHost& storage_host();
     DonorSerialHost& serial_host();
+    BaseSerialInterface& donor_serial_interface();
 
 private:
     DonorHostContractsState state_;
     PiBoardHost board_host_impl_;
     PiStorageHost storage_host_impl_;
     PiSerialHost serial_host_impl_;
+    PiDonorSerialInterfaceAdapter donor_serial_interface_impl_;
 };
 
 } // namespace pi_port
