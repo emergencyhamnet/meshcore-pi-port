@@ -1,0 +1,15 @@
+[Unit]
+Description=MeshCore Pi Port Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/meshcore-pi-port.env
+WorkingDirectory=/opt/meshcore-pi-port
+ExecStart=/opt/meshcore-pi-port/bin/meshcore-pi-port
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
