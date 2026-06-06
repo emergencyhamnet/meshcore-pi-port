@@ -17,6 +17,10 @@ struct DonorDataStoreProbeState {
     bool identity_saved;
     bool identity_file_ready;
     bool identity_loaded_after_save;
+    bool prefs_saved;
+    bool prefs_file_ready;
+    bool prefs_loaded;
+    bool prefs_roundtrip_ok;
     bool probe_ready;
 };
 
