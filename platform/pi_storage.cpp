@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 
 namespace pi_port {
 
@@ -76,6 +77,40 @@ bool storage_init(StorageLayout* layout) {
     }
 
     return true;
+}
+
+std::string storage_runtime_status_path(const StorageLayout& layout) {
+    return layout.state + "/runtime-bridge.status";
+}
+
+bool storage_write_text_file(const std::string& path, const std::string& content) {
+    if (path.empty()) {
+        return false;
+    }
+
+    std::ofstream stream(path, std::ios::out | std::ios::trunc);
+    if (!stream.is_open()) {
+        return false;
+    }
+
+    stream << content;
+    return stream.good();
+}
+
+bool storage_read_text_file(const std::string& path, std::string* content) {
+    if (path.empty() || content == nullptr) {
+        return false;
+    }
+
+    std::ifstream stream(path, std::ios::in);
+    if (!stream.is_open()) {
+        return false;
+    }
+
+    content->assign(
+        std::istreambuf_iterator<char>(stream),
+        std::istreambuf_iterator<char>());
+    return stream.good() || stream.eof();
 }
 
 } // namespace pi_port

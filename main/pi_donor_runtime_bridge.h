@@ -8,6 +8,7 @@ struct DonorRuntimeBridgeState {
     RuntimeAdapterState adapter;
     bool bridge_ready;
     bool donor_runtime_bound;
+    bool runtime_status_persisted;
 };
 
 class PiDonorRuntimeBridge {
