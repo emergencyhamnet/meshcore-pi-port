@@ -11,7 +11,7 @@ int main() {
     pi_port::PiDonorDataStoreProbe datastore_probe;
     const auto& datastore_state = datastore_probe.bind(contracts);
     pi_port::PiDonorMyMeshProbe mymesh_probe;
-    const auto& mymesh_state = mymesh_probe.bind(contracts, datastore_probe);
+    const auto& mymesh_state = mymesh_probe.bind(bridge, contracts, datastore_probe);
 
     if (!state.adapter.boot.board_ready) {
         return 1;

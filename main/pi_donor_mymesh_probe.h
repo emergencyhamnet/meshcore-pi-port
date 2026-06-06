@@ -15,6 +15,9 @@ struct DonorMyMeshProbeState {
     bool interface_started;
     bool serial_enabled_after_start;
     bool prefs_pointer_ready;
+    bool command_loop_called;
+    bool device_time_reply_ready;
+    bool device_time_reply_valid;
     bool probe_ready;
 };
 
@@ -22,7 +25,7 @@ class PiDonorMyMeshProbe {
 public:
     PiDonorMyMeshProbe();
 
-    const DonorMyMeshProbeState& bind(PiDonorHostContracts& contracts, PiDonorDataStoreProbe& datastore_probe);
+    const DonorMyMeshProbeState& bind(PiDonorRuntimeBridge& bridge, PiDonorHostContracts& contracts, PiDonorDataStoreProbe& datastore_probe);
     const DonorMyMeshProbeState& state() const;
     MyMesh* mesh();
 

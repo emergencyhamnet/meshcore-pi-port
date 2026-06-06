@@ -31,6 +31,39 @@ long random(long min_value, long) {
 
 namespace pi_port {
 
+namespace {
+
+constexpr std::uint8_t cmd_get_device_time = 5;
+constexpr std::uint8_t resp_code_curr_time = 9;
+
+bool matches_device_time_reply(const std::vector<std::uint8_t>& bytes, std::size_t start, std::uint32_t expected_time) {
+    if (bytes.size() < start + 8) {
+        return false;
+    }
+
+    if (bytes[start] != '>') {
+        return false;
+    }
+
+    const auto payload_len = static_cast<std::uint16_t>(bytes[start + 1])
+        | (static_cast<std::uint16_t>(bytes[start + 2]) << 8);
+    if (payload_len != 5) {
+        return false;
+    }
+
+    if (bytes[start + 3] != resp_code_curr_time) {
+        return false;
+    }
+
+    const auto observed_time = static_cast<std::uint32_t>(bytes[start + 4])
+        | (static_cast<std::uint32_t>(bytes[start + 5]) << 8)
+        | (static_cast<std::uint32_t>(bytes[start + 6]) << 16)
+        | (static_cast<std::uint32_t>(bytes[start + 7]) << 24);
+    return observed_time == expected_time;
+}
+
+} // namespace
+
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
     return 0;
 }
@@ -64,7 +97,7 @@ PiDonorMyMeshProbe::PiDonorMyMeshProbe()
       state_{},
       mesh_() {}
 
-const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorHostContracts& contracts, PiDonorDataStoreProbe& datastore_probe) {
+const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& bridge, PiDonorHostContracts& contracts, PiDonorDataStoreProbe& datastore_probe) {
     state_ = {};
     mesh_.reset();
 
@@ -88,6 +121,20 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorHostContracts& cont
         state_.interface_started = true;
         state_.serial_enabled_after_start = contracts.serial_host().is_enabled();
         state_.prefs_pointer_ready = mesh_->getNodePrefs() != nullptr;
+
+        constexpr std::uint32_t expected_time = 1700000000U;
+        contracts.donor_rtc_clock().setCurrentTime(expected_time);
+
+        const auto before_tx_size = bridge.adapter().transport().tx_bytes().size();
+        const std::uint8_t command_frame[] = { '<', 1, 0, cmd_get_device_time };
+        bridge.adapter().transport().inject_rx_bytes(command_frame, sizeof(command_frame));
+        mesh_->loop();
+        state_.command_loop_called = true;
+
+        const auto& tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.device_time_reply_ready = tx_bytes.size() >= before_tx_size + 8;
+        state_.device_time_reply_valid = state_.device_time_reply_ready
+            && matches_device_time_reply(tx_bytes, before_tx_size, expected_time);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -96,7 +143,10 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorHostContracts& cont
         && state_.prefs_loaded
         && state_.interface_started
         && state_.serial_enabled_after_start
-        && state_.prefs_pointer_ready;
+        && state_.prefs_pointer_ready
+        && state_.command_loop_called
+        && state_.device_time_reply_ready
+        && state_.device_time_reply_valid;
     return state_;
 }
 
