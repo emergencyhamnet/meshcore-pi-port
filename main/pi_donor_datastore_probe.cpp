@@ -105,13 +105,31 @@ bool contacts_equal(const ContactInfo& left, const ContactInfo& right) {
         && left.sync_since == right.sync_since;
 }
 
+ChannelDetails build_probe_channel() {
+    ChannelDetails channel{};
+    std::strcpy(channel.name, "ops-room");
+    for (std::size_t index = 0; index < PUB_KEY_SIZE; ++index) {
+        channel.channel.secret[index] = static_cast<std::uint8_t>(index + 32U);
+    }
+    return channel;
+}
+
+bool channels_equal(const ChannelDetails& left, const ChannelDetails& right) {
+    return std::memcmp(left.name, right.name, sizeof(left.name)) == 0
+        && std::memcmp(left.channel.secret, right.channel.secret, PUB_KEY_SIZE) == 0;
+}
+
 } // namespace
 
 PiDonorDataStoreHost::PiDonorDataStoreHost()
     : probe_contact_{},
       loaded_contact_{},
+      probe_channel_{},
+      loaded_channel_{},
       probe_contact_ready_(false),
-      loaded_contact_ready_(false) {}
+      loaded_contact_ready_(false),
+      probe_channel_ready_(false),
+      loaded_channel_ready_(false) {}
 
 void PiDonorDataStoreHost::set_probe_contact(const ContactInfo& contact) {
     probe_contact_ = contact;
@@ -131,6 +149,24 @@ const ContactInfo& PiDonorDataStoreHost::loaded_contact() const {
     return loaded_contact_;
 }
 
+void PiDonorDataStoreHost::set_probe_channel(const ChannelDetails& channel) {
+    probe_channel_ = channel;
+    probe_channel_ready_ = true;
+}
+
+void PiDonorDataStoreHost::reset_loaded_channel() {
+    loaded_channel_ = {};
+    loaded_channel_ready_ = false;
+}
+
+bool PiDonorDataStoreHost::has_loaded_channel() const {
+    return loaded_channel_ready_;
+}
+
+const ChannelDetails& PiDonorDataStoreHost::loaded_channel() const {
+    return loaded_channel_;
+}
+
 bool PiDonorDataStoreHost::onContactLoaded(const ContactInfo& contact) {
     loaded_contact_ = contact;
     loaded_contact_ready_ = true;
@@ -145,12 +181,18 @@ bool PiDonorDataStoreHost::getContactForSave(uint32_t idx, ContactInfo& contact)
     return true;
 }
 
-bool PiDonorDataStoreHost::onChannelLoaded(uint8_t, const ChannelDetails&) {
-    return true;
+bool PiDonorDataStoreHost::onChannelLoaded(uint8_t, const ChannelDetails& channel) {
+    loaded_channel_ = channel;
+    loaded_channel_ready_ = true;
+    return false;
 }
 
-bool PiDonorDataStoreHost::getChannelForSave(uint8_t, ChannelDetails&) {
-    return false;
+bool PiDonorDataStoreHost::getChannelForSave(uint8_t channel_idx, ChannelDetails& channel) {
+    if (!probe_channel_ready_ || channel_idx != 0) {
+        return false;
+    }
+    channel = probe_channel_;
+    return true;
 }
 
 PiDonorDataStoreProbe::PiDonorDataStoreProbe()
@@ -224,6 +266,21 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
         state_.contacts_loaded = host_.has_loaded_contact();
         state_.contacts_roundtrip_ok = state_.contacts_loaded
             && contacts_equal(saved_contact, host_.loaded_contact());
+
+        auto* channels_fs = secondary_fs != nullptr ? secondary_fs : &contracts.donor_primary_filesystem();
+        channels_fs->remove("/channels2");
+
+        const ChannelDetails saved_channel = build_probe_channel();
+        host_.set_probe_channel(saved_channel);
+        host_.reset_loaded_channel();
+
+        datastore_->saveChannels(&host_);
+        state_.channels_saved = channels_fs->exists("/channels2");
+        state_.channels_file_ready = state_.channels_saved;
+        datastore_->loadChannels(&host_);
+        state_.channels_loaded = host_.has_loaded_channel();
+        state_.channels_roundtrip_ok = state_.channels_loaded
+            && channels_equal(saved_channel, host_.loaded_channel());
     }
 
     state_.probe_ready = state_.datastore_host_ready
@@ -241,7 +298,11 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
         && state_.contacts_saved
         && state_.contacts_file_ready
         && state_.contacts_loaded
-        && state_.contacts_roundtrip_ok;
+        && state_.contacts_roundtrip_ok
+        && state_.channels_saved
+        && state_.channels_file_ready
+        && state_.channels_loaded
+        && state_.channels_roundtrip_ok;
     return state_;
 }
 
