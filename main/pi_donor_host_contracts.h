@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "../FS.h"
 #include "../src/MeshCore.h"
 #include "../src/helpers/BaseSerialInterface.h"
 #include "pi_donor_runtime_bridge.h"
@@ -26,6 +27,8 @@ public:
     virtual bool is_ready() const = 0;
     virtual const StorageLayout& layout() const = 0;
     virtual std::string root_path() const = 0;
+    virtual bool has_secondary_root() const = 0;
+    virtual std::string secondary_root_path() const = 0;
     virtual std::string identity_path() const = 0;
     virtual std::string state_path() const = 0;
     virtual std::string channels_path() const = 0;
@@ -82,6 +85,8 @@ struct DonorHostContractsState {
     bool serial_bound;
     bool donor_serial_interface_bound;
     bool donor_rtc_clock_bound;
+    bool donor_primary_filesystem_bound;
+    bool donor_secondary_filesystem_bound;
     bool contracts_ready;
 };
 
@@ -108,6 +113,8 @@ public:
     bool is_ready() const override;
     const StorageLayout& layout() const override;
     std::string root_path() const override;
+    bool has_secondary_root() const override;
+    std::string secondary_root_path() const override;
     std::string identity_path() const override;
     std::string state_path() const override;
     std::string channels_path() const override;
@@ -150,6 +157,8 @@ public:
     DonorSerialHost& serial_host();
     BaseSerialInterface& donor_serial_interface();
     mesh::RTCClock& donor_rtc_clock();
+    fs::FS& donor_primary_filesystem();
+    fs::FS* donor_secondary_filesystem();
 
 private:
     DonorHostContractsState state_;
@@ -158,6 +167,8 @@ private:
     PiSerialHost serial_host_impl_;
     PiDonorSerialInterfaceAdapter donor_serial_interface_impl_;
     PiDonorRTCClockAdapter donor_rtc_clock_impl_;
+    fs::FS donor_primary_filesystem_impl_;
+    fs::FS donor_secondary_filesystem_impl_;
 };
 
 } // namespace pi_port
