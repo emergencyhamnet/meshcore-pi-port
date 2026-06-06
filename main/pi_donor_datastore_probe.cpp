@@ -41,7 +41,16 @@ const DonorDataStoreProbeState& PiDonorDataStoreProbe::bind(PiDonorHostContracts
     }
 
     state_.datastore_constructed = datastore_ != nullptr;
-    state_.probe_ready = state_.datastore_host_ready && state_.datastore_constructed;
+    if (state_.datastore_constructed) {
+        datastore_->begin();
+        state_.begin_called = true;
+        state_.blob_store_ready = contracts.donor_primary_filesystem().exists("/bl");
+    }
+
+    state_.probe_ready = state_.datastore_host_ready
+        && state_.datastore_constructed
+        && state_.begin_called
+        && state_.blob_store_ready;
     return state_;
 }
 

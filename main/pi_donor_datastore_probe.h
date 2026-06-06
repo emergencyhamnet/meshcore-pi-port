@@ -11,6 +11,8 @@ struct DonorDataStoreProbeState {
     bool datastore_host_ready;
     bool datastore_constructed;
     bool using_secondary_filesystem;
+    bool begin_called;
+    bool blob_store_ready;
     bool probe_ready;
 };
 
