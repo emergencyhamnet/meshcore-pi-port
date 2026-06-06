@@ -5,6 +5,7 @@
 #include "../platform/pi_board.h"
 #include "../platform/pi_gpio.h"
 #include "../platform/pi_spi.h"
+#include "../platform/pi_transport.h"
 
 namespace pi_port {
 
@@ -44,7 +45,13 @@ RuntimeBootState boot_runtime_state() {
     }
 
     state.storage_ready = storage_init(&state.storage);
+    if (!state.storage_ready) {
+        return state;
+    }
+
     state.runtime_endpoint = runtime_endpoint_from_env();
+    state.transport_endpoint = parse_transport_endpoint(state.runtime_endpoint);
+    state.transport_ready = transport_ready(state.transport_endpoint);
     return state;
 }
 

@@ -23,5 +23,9 @@ int main() {
         return 5;
     }
 
+    if (!state.transport_ready) {
+        return 6;
+    }
+
     return 0;
 }
