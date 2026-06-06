@@ -1,10 +1,13 @@
 #include "pi_donor_mymesh_probe.h"
 
+#include <cstring>
+
 namespace {
 
 PiProbeBoard g_probe_board;
 PiProbeRadioDriver g_probe_radio_driver;
 SensorManager g_probe_sensors;
+unsigned long g_probe_millis = 0;
 
 } // namespace
 
@@ -14,6 +17,16 @@ SensorManager sensors = g_probe_sensors;
 
 mesh::LocalIdentity radio_new_identity() {
     return mesh::LocalIdentity();
+}
+
+unsigned long millis() {
+    return g_probe_millis++;
+}
+
+void randomSeed(long) {}
+
+long random(long min_value, long) {
+    return min_value;
 }
 
 namespace pi_port {
@@ -64,6 +77,13 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorHostContracts& cont
     state_.mesh_constructed = mesh_ != nullptr;
 
     if (state_.mesh_constructed) {
+        mesh_->begin(false);
+        state_.begin_called = true;
+        state_.node_name_loaded = std::strcmp(mesh_->getNodeName(), "pi-port-probe") == 0;
+        state_.prefs_loaded = mesh_->getNodePrefs() != nullptr
+            && std::strcmp(mesh_->getNodePrefs()->node_name, "pi-port-probe") == 0
+            && mesh_->getNodePrefs()->freq == 915.5f;
+
         mesh_->startInterface(contracts.donor_serial_interface());
         state_.interface_started = true;
         state_.serial_enabled_after_start = contracts.serial_host().is_enabled();
@@ -71,6 +91,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorHostContracts& cont
     }
 
     state_.probe_ready = state_.mesh_constructed
+        && state_.begin_called
+        && state_.node_name_loaded
+        && state_.prefs_loaded
         && state_.interface_started
         && state_.serial_enabled_after_start
         && state_.prefs_pointer_ready;

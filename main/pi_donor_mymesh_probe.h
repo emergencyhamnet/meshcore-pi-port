@@ -9,6 +9,9 @@ namespace pi_port {
 
 struct DonorMyMeshProbeState {
     bool mesh_constructed;
+    bool begin_called;
+    bool node_name_loaded;
+    bool prefs_loaded;
     bool interface_started;
     bool serial_enabled_after_start;
     bool prefs_pointer_ready;
