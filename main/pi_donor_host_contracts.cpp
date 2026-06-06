@@ -1,5 +1,7 @@
 #include "pi_donor_host_contracts.h"
 
+#include <ctime>
+
 #include "../platform/pi_board.h"
 #include "../platform/pi_storage.h"
 
@@ -44,6 +46,23 @@ size_t PiDonorSerialInterfaceAdapter::checkRecvFrame(uint8_t dest[]) {
     return serial_host_ == nullptr ? 0 : serial_host_->check_recv_frame(dest);
 }
 
+PiDonorRTCClockAdapter::PiDonorRTCClockAdapter()
+    : storage_host_(nullptr) {}
+
+void PiDonorRTCClockAdapter::bind(DonorStorageHost& storage_host) {
+    storage_host_ = &storage_host;
+}
+
+uint32_t PiDonorRTCClockAdapter::getCurrentTime() {
+    return storage_host_ == nullptr ? 0 : storage_host_->get_current_time();
+}
+
+void PiDonorRTCClockAdapter::setCurrentTime(uint32_t time) {
+    if (storage_host_ != nullptr) {
+        storage_host_->set_current_time(time);
+    }
+}
+
 PiBoardHost::PiBoardHost()
     : boot_state_(nullptr) {}
 
@@ -72,7 +91,9 @@ bool PiBoardHost::read_radio_busy(bool& busy) const {
 }
 
 PiStorageHost::PiStorageHost()
-    : boot_state_(nullptr) {}
+        : boot_state_(nullptr),
+            current_time_(0),
+            current_time_set_(false) {}
 
 void PiStorageHost::bind(const RuntimeBootState& boot_state) {
     boot_state_ = &boot_state;
@@ -86,8 +107,37 @@ const StorageLayout& PiStorageHost::layout() const {
     return boot_state_->storage;
 }
 
+std::string PiStorageHost::root_path() const {
+    return boot_state_ == nullptr ? std::string() : boot_state_->storage.root;
+}
+
+std::string PiStorageHost::identity_path() const {
+    return boot_state_ == nullptr ? std::string() : boot_state_->storage.identity;
+}
+
+std::string PiStorageHost::state_path() const {
+    return boot_state_ == nullptr ? std::string() : boot_state_->storage.state;
+}
+
+std::string PiStorageHost::channels_path() const {
+    return boot_state_ == nullptr ? std::string() : boot_state_->storage.channels;
+}
+
 std::string PiStorageHost::runtime_status_path() const {
     return storage_runtime_status_path(boot_state_->storage);
+}
+
+std::uint32_t PiStorageHost::get_current_time() const {
+    if (current_time_set_) {
+        return current_time_;
+    }
+
+    return static_cast<std::uint32_t>(std::time(nullptr));
+}
+
+void PiStorageHost::set_current_time(std::uint32_t time) {
+    current_time_ = time;
+    current_time_set_ = true;
 }
 
 PiSerialHost::PiSerialHost()
@@ -138,7 +188,8 @@ PiDonorHostContracts::PiDonorHostContracts()
     board_host_impl_(),
     storage_host_impl_(),
     serial_host_impl_(),
-    donor_serial_interface_impl_() {}
+    donor_serial_interface_impl_(),
+    donor_rtc_clock_impl_() {}
 
 const DonorHostContractsState& PiDonorHostContracts::bind(PiDonorRuntimeBridge& bridge) {
     state_ = {};
@@ -149,12 +200,14 @@ const DonorHostContractsState& PiDonorHostContracts::bind(PiDonorRuntimeBridge& 
     storage_host_impl_.bind(bridge_state.adapter.boot);
     serial_host_impl_.bind(bridge.adapter().transport());
     donor_serial_interface_impl_.bind(serial_host_impl_);
+    donor_rtc_clock_impl_.bind(storage_host_impl_);
 
     state_.board_bound = board_host_impl_.is_ready();
     state_.storage_bound = storage_host_impl_.is_ready();
     state_.serial_bound = serial_host_impl_.is_ready();
     state_.donor_serial_interface_bound = true;
-    state_.contracts_ready = state_.board_bound && state_.storage_bound && state_.serial_bound && state_.donor_serial_interface_bound;
+    state_.donor_rtc_clock_bound = true;
+    state_.contracts_ready = state_.board_bound && state_.storage_bound && state_.serial_bound && state_.donor_serial_interface_bound && state_.donor_rtc_clock_bound;
     return state_;
 }
 
@@ -176,6 +229,10 @@ DonorSerialHost& PiDonorHostContracts::serial_host() {
 
 BaseSerialInterface& PiDonorHostContracts::donor_serial_interface() {
     return donor_serial_interface_impl_;
+}
+
+mesh::RTCClock& PiDonorHostContracts::donor_rtc_clock() {
+    return donor_rtc_clock_impl_;
 }
 
 } // namespace pi_port
