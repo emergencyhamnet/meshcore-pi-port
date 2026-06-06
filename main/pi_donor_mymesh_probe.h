@@ -24,6 +24,8 @@ struct DonorMyMeshProbeState {
     bool app_start_reply_valid;
     bool contacts_reply_ready;
     bool contacts_reply_valid;
+    bool contacts_since_reply_ready;
+    bool contacts_since_reply_valid;
     bool probe_ready;
 };
 

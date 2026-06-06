@@ -298,6 +298,38 @@ bool matches_contacts_reply_sequence(const std::vector<std::uint8_t>& bytes, std
     return read_u32(end_start + 4) == expected_contact_lastmod;
 }
 
+bool matches_contacts_since_reply_sequence(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    constexpr std::size_t frame_size = 8;
+
+    if (bytes.size() < start + (2 * frame_size)) {
+        return false;
+    }
+
+    const auto read_u16 = [&bytes](std::size_t offset) {
+        return static_cast<std::uint16_t>(bytes[offset])
+            | (static_cast<std::uint16_t>(bytes[offset + 1]) << 8);
+    };
+    const auto read_u32 = [&bytes](std::size_t offset) {
+        return static_cast<std::uint32_t>(bytes[offset])
+            | (static_cast<std::uint32_t>(bytes[offset + 1]) << 8)
+            | (static_cast<std::uint32_t>(bytes[offset + 2]) << 16)
+            | (static_cast<std::uint32_t>(bytes[offset + 3]) << 24);
+    };
+
+    if (bytes[start] != '>' || read_u16(start + 1) != 5 || bytes[start + 3] != resp_code_contacts_start) {
+        return false;
+    }
+    if (read_u32(start + 4) != 1U) {
+        return false;
+    }
+
+    const auto end_start = start + frame_size;
+    if (bytes[end_start] != '>' || read_u16(end_start + 1) != 5 || bytes[end_start + 3] != resp_code_end_of_contacts) {
+        return false;
+    }
+    return read_u32(end_start + 4) == 0U;
+}
+
 } // namespace
 
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
@@ -403,6 +435,24 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.contacts_reply_ready = contacts_tx_bytes.size() >= before_contacts_tx_size + 167;
         state_.contacts_reply_valid = state_.contacts_reply_ready
             && matches_contacts_reply_sequence(contacts_tx_bytes, before_contacts_tx_size);
+
+        const auto before_contacts_since_tx_size = contacts_tx_bytes.size();
+        const std::uint8_t contacts_since_frame[] = {
+            '<', 5, 0, cmd_get_contacts,
+            static_cast<std::uint8_t>((expected_contact_lastmod + 1U) & 0xFF),
+            static_cast<std::uint8_t>(((expected_contact_lastmod + 1U) >> 8) & 0xFF),
+            static_cast<std::uint8_t>(((expected_contact_lastmod + 1U) >> 16) & 0xFF),
+            static_cast<std::uint8_t>(((expected_contact_lastmod + 1U) >> 24) & 0xFF)
+        };
+        bridge.adapter().transport().inject_rx_bytes(contacts_since_frame, sizeof(contacts_since_frame));
+        mesh_->loop();
+        mesh_->loop();
+        mesh_->loop();
+
+        const auto& contacts_since_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.contacts_since_reply_ready = contacts_since_tx_bytes.size() >= before_contacts_since_tx_size + 16;
+        state_.contacts_since_reply_valid = state_.contacts_since_reply_ready
+            && matches_contacts_since_reply_sequence(contacts_since_tx_bytes, before_contacts_since_tx_size);
     }
 
     state_.probe_ready = state_.mesh_constructed
@@ -420,7 +470,9 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.app_start_reply_ready
         && state_.app_start_reply_valid
         && state_.contacts_reply_ready
-        && state_.contacts_reply_valid;
+        && state_.contacts_reply_valid
+        && state_.contacts_since_reply_ready
+        && state_.contacts_since_reply_valid;
     return state_;
 }
 
