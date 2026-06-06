@@ -1,11 +1,14 @@
 #include "pi_donor_runtime_bridge.h"
 #include "pi_donor_host_contracts.h"
+#include "pi_donor_datastore_probe.h"
 
 int main() {
     pi_port::PiDonorRuntimeBridge bridge;
     const auto& state = bridge.start();
     pi_port::PiDonorHostContracts contracts;
     const auto& contract_state = contracts.bind(bridge);
+    pi_port::PiDonorDataStoreProbe datastore_probe;
+    const auto& datastore_state = datastore_probe.bind(contracts);
 
     if (!state.adapter.boot.board_ready) {
         return 1;
@@ -45,6 +48,10 @@ int main() {
 
     if (!contract_state.contracts_ready) {
         return 10;
+    }
+
+    if (!datastore_state.probe_ready) {
+        return 11;
     }
 
     return 0;
