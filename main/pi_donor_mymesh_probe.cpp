@@ -40,6 +40,7 @@ constexpr std::uint8_t cmd_device_query = 22;
 constexpr std::uint8_t resp_code_contacts_start = 2;
 constexpr std::uint8_t resp_code_contact = 3;
 constexpr std::uint8_t resp_code_end_of_contacts = 4;
+constexpr std::uint8_t resp_code_err = 1;
 constexpr std::uint8_t resp_code_curr_time = 9;
 constexpr std::uint8_t resp_code_self_info = 5;
 constexpr std::uint8_t resp_code_device_info = 13;
@@ -65,6 +66,7 @@ constexpr std::int8_t expected_tx_power_dbm = 17;
 constexpr std::uint8_t expected_contact_type = 1;
 constexpr std::uint8_t expected_contact_flags = 3;
 constexpr std::uint8_t expected_contact_out_path_len = 4;
+constexpr std::uint8_t expected_err_code_bad_state = 4;
 constexpr std::uint32_t expected_contact_last_advert_timestamp = 123456U;
 constexpr std::uint32_t expected_contact_lastmod = 654321U;
 constexpr std::int32_t expected_contact_gps_lat = 51507400;
@@ -330,6 +332,19 @@ bool matches_contacts_since_reply_sequence(const std::vector<std::uint8_t>& byte
     return read_u32(end_start + 4) == 0U;
 }
 
+bool matches_contacts_busy_reply(const std::vector<std::uint8_t>& bytes, std::size_t start) {
+    if (bytes.size() < start + 5) {
+        return false;
+    }
+
+    const auto payload_len = static_cast<std::uint16_t>(bytes[start + 1])
+        | (static_cast<std::uint16_t>(bytes[start + 2]) << 8);
+    return bytes[start] == '>'
+        && payload_len == 2
+        && bytes[start + 3] == resp_code_err
+        && bytes[start + 4] == expected_err_code_bad_state;
+}
+
 } // namespace
 
 int PiDonorMyMeshProbe::ProbeRadio::recvRaw(uint8_t*, int) {
@@ -424,8 +439,25 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         state_.app_start_reply_valid = state_.app_start_reply_ready
             && matches_app_start_reply(final_tx_bytes, before_app_start_tx_size);
 
-        const auto before_contacts_tx_size = final_tx_bytes.size();
         const std::uint8_t get_contacts_frame[] = { '<', 1, 0, cmd_get_contacts };
+        bridge.adapter().transport().inject_rx_bytes(get_contacts_frame, sizeof(get_contacts_frame));
+        mesh_->loop();
+
+        const auto& contacts_busy_tx_bytes = bridge.adapter().transport().tx_bytes();
+        const auto before_contacts_busy_err_tx_size = contacts_busy_tx_bytes.size();
+        bridge.adapter().transport().inject_rx_bytes(get_contacts_frame, sizeof(get_contacts_frame));
+        mesh_->loop();
+        mesh_->loop();
+
+        const auto& contacts_busy_err_tx_bytes = bridge.adapter().transport().tx_bytes();
+        state_.contacts_busy_reply_ready = contacts_busy_err_tx_bytes.size() >= before_contacts_busy_err_tx_size + 5;
+        state_.contacts_busy_reply_valid = state_.contacts_busy_reply_ready
+            && matches_contacts_busy_reply(contacts_busy_err_tx_bytes, before_contacts_busy_err_tx_size);
+
+        // Drain the iterator that was left running by the busy-state request path.
+        mesh_->loop();
+
+        const auto before_contacts_tx_size = bridge.adapter().transport().tx_bytes().size();
         bridge.adapter().transport().inject_rx_bytes(get_contacts_frame, sizeof(get_contacts_frame));
         mesh_->loop();
         mesh_->loop();
@@ -469,6 +501,8 @@ const DonorMyMeshProbeState& PiDonorMyMeshProbe::bind(PiDonorRuntimeBridge& brid
         && state_.device_query_reply_valid
         && state_.app_start_reply_ready
         && state_.app_start_reply_valid
+        && state_.contacts_busy_reply_ready
+        && state_.contacts_busy_reply_valid
         && state_.contacts_reply_ready
         && state_.contacts_reply_valid
         && state_.contacts_since_reply_ready
