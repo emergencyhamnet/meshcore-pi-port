@@ -59,14 +59,15 @@ Current defaults if you do not override them:
 Use this order exactly.
 
 1. `scripts/build-pi-runtime.sh`
-2. build the Pi runtime binary with your Pi-native compiler integration
-3. run the runtime binary
-4. `scripts/run-donor-api-smoke.sh`
-5. `scripts/run-radio-smoke.sh`
-6. do one receive-only RF check
-7. only then move to controlled transmit testing
+2. run the runtime binary
+3. `scripts/run-donor-api-smoke.sh`
+4. `scripts/run-radio-smoke.sh`
+5. do one receive-only RF check
+6. only then move to controlled transmit testing
 
-## Step 1: Preflight
+## Step 1: Build The Runtime Binary
+
+The repo now has a concrete Pi-native build script for the runtime entrypoint, and it performs the preflight checks as part of the build.
 
 Run:
 
@@ -74,16 +75,11 @@ Run:
 scripts/build-pi-runtime.sh
 ```
 
-This validates:
+Current build behavior:
 
-1. Linux host execution
-2. compiler availability
-3. presence of the Pi runtime source surface
-4. storage directory layout creation
-
-## Step 2: Build The Runtime Binary
-
-The repo now has a concrete Pi entrypoint at `main/pi_companion_main.cpp` and Pi bring-up scripts, but the exact compiler command still has to be executed on the Pi-native toolchain.
+1. compiles the Pi runtime into `$MESHCORE_PI_RUNTIME_BIN`
+2. uses a native `g++` command line with the Pi runtime sources, donor companion sources, core MeshCore sources, helper sources, and the local `lib/ed25519` C sources
+3. bakes in the current firmware defaults used by the donor probe surface unless you override `FIRMWARE_VERSION` or `FIRMWARE_BUILD_DATE`
 
 Expected outcome from the first build:
 
@@ -91,7 +87,7 @@ Expected outcome from the first build:
 2. no donor source edits during bring-up
 3. the binary exits with code `0` only when all current boot, storage, transport, and donor probe checks pass
 
-## Step 3: Run The Runtime
+## Step 2: Run The Runtime
 
 Run the binary with the same exported environment.
 
@@ -108,7 +104,7 @@ The current status file path is:
 $MESHCORE_PI_STORAGE_ROOT/state/runtime-bridge.status
 ```
 
-## Step 4: Donor API Smoke
+## Step 3: Donor API Smoke
 
 Run:
 
@@ -130,7 +126,7 @@ After that, do one manual companion handshake against the live endpoint covering
 3. `CMD_GET_DEVICE_TIME`
 4. `CMD_GET_CONTACTS`
 
-## Step 5: Radio Smoke
+## Step 4: Radio Smoke
 
 Run:
 
@@ -145,7 +141,7 @@ This checks:
 3. expected radio HAT pin mapping
 4. live GPIO state dump if `pinctrl` or `raspi-gpio` is available
 
-## Step 6: First RF Test
+## Step 5: First RF Test
 
 Do not start with transmit.
 
