@@ -39,6 +39,7 @@ For developers:
 - Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
 - Clone and open the MeshCore repository in Visual Studio Code.
 - For the Raspberry Pi HAT port alpha, start with [docs/pi_alpha_release.md](./docs/pi_alpha_release.md) and [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md).
+- The current Raspberry Pi HAT port is validated against an `SX1262`-class radio path with explicit `TXEN/RXEN` control. See [docs/pi_hat_pinout.md](./docs/pi_hat_pinout.md) for the expected Pi wiring and radio-family assumptions.
 - See the example applications you can modify and run:
   - [Companion Radio](./examples/companion_radio) - For use with an external chat app, over BLE, USB or Wi-Fi.
   - [KISS Modem](./examples/kiss_modem) - Serial KISS protocol bridge for host applications. ([protocol docs](./docs/kiss_modem_protocol.md))

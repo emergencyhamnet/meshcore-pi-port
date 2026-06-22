@@ -52,6 +52,10 @@ Expected HAT mapping:
 6. `RXEN = GPIO27`
 7. `SPI = SPI0`
 
+See also:
+
+1. `docs/pi_hat_pinout.md` for the dedicated pinout reference and radio-family note
+
 ## Environment
 
 Export the runtime settings before bring-up.
