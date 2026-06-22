@@ -10,9 +10,23 @@ What this phase is for:
 
 What this phase is not for:
 
-1. full basestation integration
+1. full external integration stacks
 2. broad interoperability testing across many donor features
 3. uncontrolled live transmit testing as the first hardware step
+
+For standalone alpha app-mode validation, telemetry can come from a static snapshot file instead of live sensors.
+
+Generate one with:
+
+```bash
+python3 scripts/write-dummy-telemetry-snapshot.py
+```
+
+There is now a separate host-radio bring-up path for the missing Linux HAL layer:
+
+1. `scripts/build-pi-radiolib-smoke.sh`
+2. run the smoke binary without transmit first
+3. only then do one controlled `--tx` burst
 
 ## Preconditions
 
@@ -25,6 +39,8 @@ Minimum expectations:
 3. the repo checked out locally on the Pi
 4. SPI enabled on the Pi
 5. the radio HAT wired to the expected GPIO mapping
+6. `lgpio` development headers installed for the non-Arduino RadioLib HAL
+7. a system-installed `RadioLib` prefix, default `/usr/local`
 
 Expected HAT mapping:
 
@@ -46,6 +62,7 @@ Example:
 export MESHCORE_PI_RUNTIME_ENDPOINT="serial:///dev/ttyS0"
 export MESHCORE_PI_STORAGE_ROOT="/var/lib/meshcore-pi-port"
 export MESHCORE_PI_RUNTIME_BIN="$PWD/bin/pi-companion-runtime"
+export MESHCORE_PI_TELEMETRY_SNAPSHOT_PATH="/tmp/meshcore-pi-telemetry.env"
 ```
 
 Current defaults if you do not override them:
@@ -53,6 +70,29 @@ Current defaults if you do not override them:
 1. runtime endpoint: `serial:///dev/ttyS0`
 2. storage root: `/var/lib/meshcore-pi-port`
 3. runtime status file: `/var/lib/meshcore-pi-port/state/runtime-bridge.status`
+
+## Optional Service Install
+
+Once the live runtime is built and manually validated, install the boot-time service with:
+
+```bash
+sudo bash scripts/install-pi-live-runtime-service.sh
+```
+
+What this does:
+
+1. installs `deploy/systemd/meshcore-pi-live-runtime.service` into `/etc/systemd/system`
+2. points the unit at the checked-out repo path and current runtime binary
+3. creates the runtime storage directories if needed
+4. enables the service for boot
+
+Recommended follow-up:
+
+```bash
+sudo systemctl start meshcore-pi-live-runtime.service
+sudo systemctl status meshcore-pi-live-runtime.service --no-pager
+journalctl -u meshcore-pi-live-runtime.service -n 50 --no-pager
+```
 
 ## Bring-Up Order
 
@@ -64,6 +104,29 @@ Use this order exactly.
 4. `scripts/run-radio-smoke.sh`
 5. do one receive-only RF check
 6. only then move to controlled transmit testing
+
+## RadioLib Host Bring-Up
+
+Use this only when you are working on the missing live Linux radio binding.
+
+Run:
+
+```bash
+scripts/build-pi-radiolib-smoke.sh
+bin/pi-radiolib-smoke
+```
+
+Optional controlled burst:
+
+```bash
+bin/pi-radiolib-smoke --tx meshcore-smoke
+```
+
+This path is intentionally separate from the donor runtime. It is meant to validate:
+
+1. `RadioLib` is installed on the Pi in a usable non-Arduino layout
+2. `lgpio` can drive the expected GPIO and SPI surfaces
+3. the donor `CustomSX1262Wrapper` can initialize on Linux before it is folded into the persistent runtime
 
 ## Step 1: Build The Runtime Binary
 
@@ -89,7 +152,13 @@ Expected outcome from the first build:
 
 ## Step 2: Run The Runtime
 
-Run the binary with the same exported environment.
+Run:
+
+```bash
+bash scripts/run-pi-live-runtime.sh
+```
+
+This launcher preserves the same exported environment, ensures only one `pi-live-runtime` process is active, and then `exec`s the live runtime binary.
 
 Minimum success conditions:
 
@@ -126,6 +195,14 @@ After that, do one manual companion handshake against the live endpoint covering
 3. `CMD_GET_DEVICE_TIME`
 4. `CMD_GET_CONTACTS`
 
+Or run the automated local handshake check on the Pi:
+
+```bash
+MESHCORE_PI_STORAGE_ROOT=/home/n2dh/meshcore-pi-port-state python3 scripts/run-live-companion-handshake.py
+```
+
+This temporarily brings the live runtime up on a localhost TCP endpoint, exercises the four companion commands, and then restores the default serial live runtime.
+
 ## Step 4: Radio Smoke
 
 Run:
@@ -149,9 +226,16 @@ First RF test order:
 
 1. bring the runtime up with the HAT attached
 2. confirm radio init does not hang
-3. leave the Pi in receive mode
-4. transmit from a known-good donor node nearby
-5. observe whether the Pi-hosted runtime can receive adverts or traffic
+3. start a persisted-contact watcher on the Pi:
+
+```bash
+MESHCORE_PI_STORAGE_ROOT=/home/n2dh/meshcore-pi-port-state \
+python3 scripts/await-pi-rx-contact.py --timeout 60
+```
+
+4. leave the Pi in receive mode
+5. transmit from a known-good donor node nearby
+6. verify the watcher reports a new or updated contact record in `$MESHCORE_PI_STORAGE_ROOT/channels/contacts3`
 
 Only after receive works should you try:
 
