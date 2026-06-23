@@ -2,6 +2,8 @@
 
 This document defines the smallest standalone alpha release for the Raspberry Pi HAT port.
 
+For a more detailed operator flow covering prerequisites, build dependencies, service install, validation, and packaging, see `docs/pi_install_build_release.md`.
+
 ## Scope
 
 The alpha release should include only the Pi port source tree and the surfaces needed to make the published MeshCore app work.
