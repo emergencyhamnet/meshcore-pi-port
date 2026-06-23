@@ -2,6 +2,14 @@
 
 Standalone Raspberry Pi HAT port of MeshCore, built to run a complete MeshCore node on a Pi with donor-faithful runtime behavior, companion-app compatibility, and Pi-native runtime integration.
 
+## Quick Start
+
+If you want to build and run the current Pi alpha on supported hardware, start here:
+
+1. `docs/pi_hat_pinout.md` for supported radio-family and wiring assumptions
+2. `docs/pi_install_build_release.md` for prerequisites, build, install, validation, and release packaging
+3. `docs/pi_alpha_release.md` for alpha scope and release contract
+
 ## Status
 
 This repository currently represents an early standalone alpha of the Pi port.
@@ -26,22 +34,7 @@ Supported path today:
 3. separate `BUSY`, `RESET`, `DIO1`, and `NSS` lines
 4. `SPI0` connection to the Raspberry Pi
 
-## HEAD
-This means the current port is built for a Pi HAT style radio design in the same family as the present E22-style `SX1262` implementation, not a generic “any LoRa board on a Pi” target.
-
-- Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
-- Clone and open the MeshCore repository in Visual Studio Code.
-- For the Raspberry Pi HAT port alpha, start with [docs/pi_alpha_release.md](./docs/pi_alpha_release.md) and [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md).
-- For a step-by-step Pi install, build, validation, and release flow, use [docs/pi_install_build_release.md](./docs/pi_install_build_release.md).
-- The current Raspberry Pi HAT port is validated against an `SX1262`-class radio path with explicit `TXEN/RXEN` control. See [docs/pi_hat_pinout.md](./docs/pi_hat_pinout.md) for the expected Pi wiring and radio-family assumptions.
-- See the example applications you can modify and run:
-  - [Companion Radio](./examples/companion_radio) - For use with an external chat app, over BLE, USB or Wi-Fi.
-  - [KISS Modem](./examples/kiss_modem) - Serial KISS protocol bridge for host applications. ([protocol docs](./docs/kiss_modem_protocol.md))
-  - [Simple Repeater](./examples/simple_repeater) - Extends network coverage by relaying messages.
-  - [Simple Room Server](./examples/simple_room_server) - A simple BBS server for shared Posts.
-  - [Simple Secure Chat](./examples/simple_secure_chat) - Secure terminal based text communication between devices.
-  - [Simple Sensor](./examples/simple_sensor) - Remote sensor node with telemetry and alerting.
->>>>>>> fa80a140 (Improve Pi install, build, and release documentation)
+This means the current port is built for a Pi HAT style radio design in the same family as the present E22-style `SX1262` implementation, not a generic "any LoRa board on a Pi" target.
 
 See:
 
@@ -95,9 +88,51 @@ A dummy telemetry snapshot can be generated with:
 
 ```bash
 python3 scripts/write-dummy-telemetry-snapshot.py
+```
 
+## Build And Install
 
+For a practical install, build, validation, and release flow, use:
 
+1. [docs/pi_install_build_release.md](./docs/pi_install_build_release.md)
+
+For alpha scope and release-contract notes, see:
+
+1. [docs/pi_alpha_release.md](./docs/pi_alpha_release.md)
+
+For detailed bring-up and radio validation guidance, see:
+
+1. [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md)
+
+## Current Limitations
+
+This alpha does not yet claim:
+
+1. generic support for arbitrary Pi-attached LoRa radios
+2. full basestation integration as part of the release contract
+3. appliance-style Pi image packaging
+4. broad hardware abstraction across all SX126x variants
+
+The supported path today is the specific Pi HAT radio family documented in this repo.
+
+## Upstream Relationship
+
+This port is built on donor-faithful MeshCore behavior rather than a clean-room reimplementation.
+
+The Pi-specific work focuses on the Linux host boundary:
+
+1. runtime bootstrap
+2. storage
+3. transport
+4. GPIO
+5. SPI
+6. RadioLib HAL integration
+
+Core MeshCore routing, datastore, and companion behavior continue to come from the upstream MeshCore codebase.
+
+## License
+
+MeshCore is open-source software released under the MIT License. See the repository license files for details.
 
 
 
