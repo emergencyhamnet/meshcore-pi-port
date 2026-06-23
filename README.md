@@ -26,9 +26,9 @@ Supported path today:
 3. separate `BUSY`, `RESET`, `DIO1`, and `NSS` lines
 4. `SPI0` connection to the Raspberry Pi
 
-<<<<<<< HEAD
+## HEAD
 This means the current port is built for a Pi HAT style radio design in the same family as the present E22-style `SX1262` implementation, not a generic “any LoRa board on a Pi” target.
-=======
+
 - Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
 - Clone and open the MeshCore repository in Visual Studio Code.
 - For the Raspberry Pi HAT port alpha, start with [docs/pi_alpha_release.md](./docs/pi_alpha_release.md) and [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md).
