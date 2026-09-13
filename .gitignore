@@ -27,3 +27,8 @@ probe_send_sites.txt
 .vscode/tasks-test-placeholder.json
 /meshcore-pi-port/
 
+
+# Pi build outputs
+.build/
+bin/pi-*
+

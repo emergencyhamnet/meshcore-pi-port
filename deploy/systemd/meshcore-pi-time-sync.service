@@ -1,0 +1,15 @@
+[Unit]
+Description=MeshCore Pi Time Sync
+After=network-online.target meshcore-pi-live-runtime.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/meshcore-pi-port
+Environment=MESHCORE_PI_STORAGE_ROOT=/var/lib/meshcore-pi-port
+Environment=MESHCORE_PI_TIME_SOURCE=host
+Environment=MESHCORE_PI_SET_HOST_CLOCK=0
+Environment=MESHCORE_PI_GPSD_HOST=127.0.0.1
+Environment=MESHCORE_PI_GPSD_PORT=2947
+ExecStart=/usr/bin/env python3 /opt/meshcore-pi-port/scripts/sync-pi-node-time.py
