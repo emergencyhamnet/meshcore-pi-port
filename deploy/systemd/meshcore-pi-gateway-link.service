@@ -1,0 +1,21 @@
+[Unit]
+Description=MeshCore Pi Gateway Link
+After=network-online.target meshcore-pi-live-runtime.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/meshcore-pi-port
+Environment=MESHCORE_PI_INTERFACE_MODE=app
+Environment=MESHCORE_PI_GATEWAY_LINK_HOST=0.0.0.0
+Environment=MESHCORE_PI_GATEWAY_LINK_PORT=7463
+Environment=MESHCORE_PI_GATEWAY_LINK_ALLOW_TX=1
+Environment=MESHCORE_PI_STORAGE_ROOT=/var/lib/meshcore-pi-port
+Environment=MESHCORE_PI_LIVE_RUNTIME_SERVICE=meshcore-pi-live-runtime.service
+ExecStart=/bin/bash /opt/meshcore-pi-port/scripts/run-pi-gateway-link.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

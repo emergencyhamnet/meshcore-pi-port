@@ -44,6 +44,7 @@ for path in \
 	main \
 	platform \
 	src \
+	ui-native \
 	examples/companion_radio \
 	include \
 	lib/ed25519 \
@@ -51,6 +52,7 @@ for path in \
 	deploy/systemd \
 	ui \
 	docs/PI_NATIVE_BRINGUP.md \
+	docs/PI_BROWSER_UI_MOVE_PLAN.md \
 	docs/pi_node_interface.md \
 	docs/pi_alpha_release.md; do
 	if [[ -d "$path" ]]; then
@@ -65,15 +67,23 @@ for path in \
 	if [[ -x "$runtime_bin" ]]; then
 		for path in \
 			README.md \
+			ui-native \
 			scripts/run-pi-live-runtime.sh \
 			scripts/run-pi-companion-service.py \
 			scripts/install-pi-live-runtime-service.sh \
-			scripts/install-pi-node-ui-service.sh \
+			scripts/run-pi-gateway-link.sh \
+			scripts/install-pi-gateway-link-service.sh \
+			scripts/run-pi-browser-ui.sh \
+			scripts/install-pi-browser-ui-service.sh \
+			scripts/retire-pi-management-ui.sh \
 			scripts/write-dummy-telemetry-snapshot.py \
 			deploy/systemd/meshcore-pi-live-runtime.service \
-			deploy/systemd/meshcore-pi-node-ui.service \
+			deploy/systemd/meshcore-pi-gateway-link.service \
+			deploy/systemd/meshcore-pi-browser-ui.service \
+			ui/pi_gateway_link_server.py \
 			docs/pi_alpha_release.md \
-			docs/PI_NATIVE_BRINGUP.md; do
+			docs/PI_NATIVE_BRINGUP.md \
+			docs/PI_BROWSER_UI_MOVE_PLAN.md; do
 			if [[ -d "$path" ]]; then
 				copy_tree "$path" "$binary_root/$path"
 			else

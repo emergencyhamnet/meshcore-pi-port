@@ -46,18 +46,31 @@ sudo systemctl start meshcore-pi-live-runtime.service
 sudo systemctl status meshcore-pi-live-runtime.service --no-pager
 ```
 
-Optional local status UI:
+Retire the old local management UI if it is still installed:
 
 ```bash
-sudo env MESHCORE_PI_INTERFACE_MODE=app bash scripts/install-pi-node-ui-service.sh
-sudo systemctl start meshcore-pi-node-ui.service
+sudo bash scripts/retire-pi-management-ui.sh
+```
+
+Install the Pi-hosted browser UI:
+
+```bash
+sudo bash scripts/install-pi-browser-ui-service.sh
+sudo systemctl start meshcore-pi-browser-ui.service
 ```
 
 Expected alpha endpoints:
 
 1. published MeshCore app path: `127.0.0.1:5040`
 2. donor runtime internal transport: `127.0.0.1:5041`
-3. optional Pi node UI: `http://<pi-host>:8088`
+3. final Pi-hosted browser UI: `http://<pi-host>:8099`
+4. basestation-facing gateway link: `tcp://<pi-host>:7463`
+
+Interface notes:
+
+1. `8099` is the intended Pi-hosted browser UI port for the new relocatable UI
+2. the old `8088` management UI should be retired when moving to the new browser UI service
+3. the basestation-facing pipe is a separate concern from this standalone alpha path and should not be treated as the browser UI API
 
 ## Telemetry Snapshot Contract
 
@@ -105,7 +118,7 @@ Release these source surfaces together:
 6. `deploy/systemd/`
 7. `ui/`
 8. `docs/PI_NATIVE_BRINGUP.md`
-9. `docs/pi_node_interface.md`
+9. `docs/WINDOWS_NATIVE_UI_RESET.md`
 10. `docs/pi_alpha_release.md`
 
 ## Minimum Validation Before Tagging

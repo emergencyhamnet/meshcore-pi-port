@@ -167,19 +167,26 @@ sudo --preserve-env=MESHCORE_PI_STORAGE_ROOT,MESHCORE_PI_TELEMETRY_SNAPSHOT_PATH
 	env MESHCORE_PI_INTERFACE_MODE=app bash scripts/install-pi-live-runtime-service.sh
 ```
 
-Optional local status UI:
+Retire the old local management UI if it is still installed:
 
 ```bash
-sudo env MESHCORE_PI_INTERFACE_MODE=app bash scripts/install-pi-node-ui-service.sh
-sudo systemctl start meshcore-pi-node-ui.service
-sudo systemctl status meshcore-pi-node-ui.service --no-pager
+sudo bash scripts/retire-pi-management-ui.sh
+```
+
+Install the Pi-hosted browser UI:
+
+```bash
+sudo bash scripts/install-pi-browser-ui-service.sh
+sudo systemctl start meshcore-pi-browser-ui.service
+sudo systemctl status meshcore-pi-browser-ui.service --no-pager
 ```
 
 Expected app-mode endpoints:
 
 1. published MeshCore app bridge: `127.0.0.1:5040`
 2. donor runtime internal transport: `127.0.0.1:5041`
-3. optional node UI: `http://<pi-host>:8088`
+3. final Pi-hosted browser UI: `http://<pi-host>:8099`
+4. basestation gateway link: `tcp://<pi-host>:7463`
 
 ## Minimum Validation
 
@@ -187,7 +194,7 @@ After installation, validate in this order:
 
 1. `systemctl status meshcore-pi-live-runtime.service --no-pager`
 2. `journalctl -u meshcore-pi-live-runtime.service -n 50 --no-pager`
-3. `python3 scripts/run-live-companion-handshake.py` with the correct `MESHCORE_PI_STORAGE_ROOT` if needed
+3. `python3 scripts/run-native-companion-smoke.py --host 127.0.0.1 --port 5040`
 4. published MeshCore app connection through `127.0.0.1:5040`
 5. self telemetry readback using the dummy snapshot or live telemetry provider
 

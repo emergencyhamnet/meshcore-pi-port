@@ -5,6 +5,7 @@
 #include <string>
 
 #include "../FS.h"
+#include "../platform/pi_board.h"
 #include "../src/MeshCore.h"
 #include "../src/helpers/BaseSerialInterface.h"
 #include "pi_donor_runtime_bridge.h"
@@ -124,7 +125,7 @@ public:
 
 private:
     const RuntimeBootState* boot_state_;
-    std::uint32_t current_time_;
+    std::int64_t current_time_offset_seconds_;
     bool current_time_set_;
 };
 

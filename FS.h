@@ -2,9 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Stream.h"
 
@@ -21,13 +23,27 @@ public:
     bool open_write(const std::string& path, bool truncate);
     void close();
 
+    int available() override;
     int read() override;
+    int peek() override;
     std::size_t read(std::uint8_t* buffer, std::size_t length);
     std::size_t write(std::uint8_t value) override;
     std::size_t write(const std::uint8_t* buffer, std::size_t length) override;
+    void flush() override;
+
+    bool isDirectory() const;
+    const char* name() const;
+    std::uint32_t size() const;
+    File openNextFile();
+    void rewindDirectory();
 
 private:
     std::shared_ptr<std::fstream> stream_;
+    std::shared_ptr<std::vector<std::filesystem::directory_entry>> directory_entries_;
+    std::size_t directory_index_;
+    bool is_directory_;
+    std::string path_;
+    std::string name_;
 };
 
 namespace fs {

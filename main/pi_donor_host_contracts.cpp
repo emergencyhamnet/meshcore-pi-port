@@ -1,10 +1,34 @@
 #include "pi_donor_host_contracts.h"
 
+#include <cstdarg>
+#include <cstdio>
 #include <ctime>
 #include <filesystem>
 
 #include "../platform/pi_board.h"
 #include "../platform/pi_storage.h"
+
+std::size_t Stream::printf(const char* format, ...) {
+    if (format == nullptr) {
+        return 0;
+    }
+
+    va_list args;
+    va_start(args, format);
+    va_list args_copy;
+    va_copy(args_copy, args);
+    const int required = std::vsnprintf(nullptr, 0, format, args_copy);
+    va_end(args_copy);
+    if (required <= 0) {
+        va_end(args);
+        return 0;
+    }
+
+    std::string buffer(static_cast<std::size_t>(required), '\0');
+    std::vsnprintf(buffer.data(), buffer.size() + 1, format, args);
+    va_end(args);
+    return write(reinterpret_cast<const std::uint8_t*>(buffer.data()), buffer.size());
+}
 
 std::size_t Stream::print(const char* text) {
     if (text == nullptr) {
@@ -23,18 +47,46 @@ std::size_t Stream::println(const char* text) {
 }
 
 File::File()
-    : stream_() {}
+    : stream_(),
+      directory_entries_(),
+      directory_index_(0),
+      is_directory_(false),
+      path_(),
+      name_() {}
 
 File::operator bool() const {
-    return stream_ != nullptr && stream_->is_open();
+    return is_directory_ || (stream_ != nullptr && stream_->is_open());
 }
 
 bool File::open_read(const std::string& path) {
+    close();
+    path_ = path;
+    name_ = std::filesystem::path(path).filename().string();
+
+    std::error_code error;
+    if (std::filesystem::is_directory(path, error) && !error) {
+        auto entries = std::make_shared<std::vector<std::filesystem::directory_entry>>();
+        for (const auto& entry : std::filesystem::directory_iterator(path, error)) {
+            if (error) {
+                close();
+                return false;
+            }
+            entries->push_back(entry);
+        }
+        directory_entries_ = std::move(entries);
+        directory_index_ = 0;
+        is_directory_ = true;
+        return true;
+    }
+
     stream_ = std::make_shared<std::fstream>(path, std::ios::in | std::ios::binary);
     return static_cast<bool>(*this);
 }
 
 bool File::open_write(const std::string& path, bool truncate) {
+    close();
+    path_ = path;
+    name_ = std::filesystem::path(path).filename().string();
     auto open_mode = std::ios::out | std::ios::binary;
     if (truncate) {
         open_mode |= std::ios::trunc;
@@ -47,10 +99,35 @@ void File::close() {
     if (stream_ != nullptr) {
         stream_->close();
     }
+    stream_.reset();
+    directory_entries_.reset();
+    directory_index_ = 0;
+    is_directory_ = false;
+    path_.clear();
+    name_.clear();
+}
+
+int File::available() {
+    if (!static_cast<bool>(*this) || is_directory_) {
+        return 0;
+    }
+
+    const auto current = stream_->tellg();
+    if (current < 0) {
+        return 0;
+    }
+
+    stream_->seekg(0, std::ios::end);
+    const auto end = stream_->tellg();
+    stream_->seekg(current, std::ios::beg);
+    if (end < current) {
+        return 0;
+    }
+    return static_cast<int>(end - current);
 }
 
 int File::read() {
-    if (!static_cast<bool>(*this)) {
+    if (!static_cast<bool>(*this) || is_directory_) {
         return -1;
     }
 
@@ -58,8 +135,17 @@ int File::read() {
     return value == std::char_traits<char>::eof() ? -1 : value;
 }
 
+int File::peek() {
+    if (!static_cast<bool>(*this) || is_directory_) {
+        return -1;
+    }
+
+    const int value = stream_->peek();
+    return value == std::char_traits<char>::eof() ? -1 : value;
+}
+
 std::size_t File::read(std::uint8_t* buffer, std::size_t length) {
-    if (!static_cast<bool>(*this) || buffer == nullptr) {
+    if (!static_cast<bool>(*this) || is_directory_ || buffer == nullptr) {
         return 0;
     }
 
@@ -68,7 +154,7 @@ std::size_t File::read(std::uint8_t* buffer, std::size_t length) {
 }
 
 std::size_t File::write(std::uint8_t value) {
-    if (!static_cast<bool>(*this)) {
+    if (!static_cast<bool>(*this) || is_directory_) {
         return 0;
     }
 
@@ -77,12 +163,62 @@ std::size_t File::write(std::uint8_t value) {
 }
 
 std::size_t File::write(const std::uint8_t* buffer, std::size_t length) {
-    if (!static_cast<bool>(*this) || buffer == nullptr) {
+    if (!static_cast<bool>(*this) || is_directory_ || buffer == nullptr) {
         return 0;
     }
 
     stream_->write(reinterpret_cast<const char*>(buffer), static_cast<std::streamsize>(length));
     return stream_->good() ? length : 0U;
+}
+
+void File::flush() {
+    if (stream_ != nullptr) {
+        stream_->flush();
+    }
+}
+
+bool File::isDirectory() const {
+    return is_directory_;
+}
+
+const char* File::name() const {
+    return name_.c_str();
+}
+
+std::uint32_t File::size() const {
+    if (!static_cast<bool>(*this) || is_directory_ || path_.empty()) {
+        return 0;
+    }
+
+    std::error_code error;
+    const auto file_size = std::filesystem::file_size(path_, error);
+    if (error) {
+        return 0;
+    }
+    return static_cast<std::uint32_t>(file_size);
+}
+
+File File::openNextFile() {
+    File next;
+    if (!is_directory_ || directory_entries_ == nullptr) {
+        return next;
+    }
+
+    while (directory_index_ < directory_entries_->size()) {
+        const auto& entry = (*directory_entries_)[directory_index_++];
+        if (next.open_read(entry.path().string())) {
+            next.name_ = entry.path().filename().string();
+            return next;
+        }
+    }
+
+    return next;
+}
+
+void File::rewindDirectory() {
+    if (is_directory_) {
+        directory_index_ = 0;
+    }
 }
 
 namespace fs {
@@ -277,7 +413,7 @@ bool PiBoardHost::read_radio_busy(bool& busy) const {
 
 PiStorageHost::PiStorageHost()
         : boot_state_(nullptr),
-            current_time_(0),
+            current_time_offset_seconds_(0),
             current_time_set_(false) {}
 
 void PiStorageHost::bind(const RuntimeBootState& boot_state) {
@@ -321,15 +457,17 @@ std::string PiStorageHost::runtime_status_path() const {
 }
 
 std::uint32_t PiStorageHost::get_current_time() const {
-    if (current_time_set_) {
-        return current_time_;
+    const std::int64_t system_time = static_cast<std::int64_t>(std::time(nullptr));
+    if (!current_time_set_) {
+        return static_cast<std::uint32_t>(system_time);
     }
 
-    return static_cast<std::uint32_t>(std::time(nullptr));
+    return static_cast<std::uint32_t>(system_time + current_time_offset_seconds_);
 }
 
 void PiStorageHost::set_current_time(std::uint32_t time) {
-    current_time_ = time;
+    const std::int64_t system_time = static_cast<std::int64_t>(std::time(nullptr));
+    current_time_offset_seconds_ = static_cast<std::int64_t>(time) - system_time;
     current_time_set_ = true;
 }
 

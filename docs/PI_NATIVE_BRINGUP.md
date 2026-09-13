@@ -98,6 +98,35 @@ sudo systemctl status meshcore-pi-live-runtime.service --no-pager
 journalctl -u meshcore-pi-live-runtime.service -n 50 --no-pager
 ```
 
+## Optional Gateway-Link Service Install
+
+If you want the basestation pipe to stay up without an open command window, install
+the gateway-link as its own service after the runtime is validated:
+
+```bash
+sudo bash scripts/install-pi-gateway-link-service.sh
+```
+
+Recommended follow-up:
+
+```bash
+sudo systemctl start meshcore-pi-gateway-link.service
+sudo systemctl status meshcore-pi-gateway-link.service --no-pager
+journalctl -u meshcore-pi-gateway-link.service -n 50 --no-pager
+```
+
+This gives the pipe explicit start, stop, restart, and status control through
+`systemctl` instead of tying it to a foreground shell.
+
+Role of this service:
+
+1. this service is the basestation-facing pipe, not the local node UI
+2. local Pi code is expected here because it adapts the Pi node into a broader gateway/basestation interface
+3. it must not redefine the native MeshCore API used by the Windows UI
+4. if the Windows UI later rides this service remotely, that usage should be as a thin relay for native MeshCore semantics rather than as a second application API
+
+The final local human UI should be the new browser service on `8099`, while the older `8088` management UI should be retired if it is still installed.
+
 ## Bring-Up Order
 
 Use this order exactly.
@@ -202,10 +231,10 @@ After that, do one manual companion handshake against the live endpoint covering
 Or run the automated local handshake check on the Pi:
 
 ```bash
-MESHCORE_PI_STORAGE_ROOT=/home/n2dh/meshcore-pi-port-state python3 scripts/run-live-companion-handshake.py
+python3 scripts/run-native-companion-smoke.py --host 127.0.0.1 --port 5040
 ```
 
-This temporarily brings the live runtime up on a localhost TCP endpoint, exercises the four companion commands, and then restores the default serial live runtime.
+This exercises the native TCP companion bridge directly and returns a JSON summary of self info, device info, contacts, channels, battery, and custom vars when available.
 
 ## Step 4: Radio Smoke
 

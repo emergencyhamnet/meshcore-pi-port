@@ -1,0 +1,233 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "probe-workbench-meshcore-status",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-s",
+				"http://127.0.0.1:18098/api/gateways/meshcore"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "probe-pi-services",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"systemctl status meshcore-pi-browser-ui.service meshcore-pi-live-runtime.service --no-pager --lines 20"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "probe-pi-listeners",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ss -ltn | grep -E '(:8099|:7463|:5040)'"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "probe-pi-7463-listener",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ss -ltn | grep 7463"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "smoke-pi-local-7463",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"cd /home/n2dh/meshcore-pi-port/scripts; python3 run-gateway-link-smoke.py --host 127.0.0.1 --port 7463 --timeout 10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "show-pi-browser-ui-journal",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"journalctl -u meshcore-pi-browser-ui.service -n 80 --no-pager"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "probe-pi-node-page-http",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"curl -s --max-time 10 http://127.0.0.1:8099/api/node-page"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "stop-temp-pi-17463",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"pkill -f \"meshcore_ui_native.gateway_link_server --host 127.0.0.1 --port 17463\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "reprobe-pi-node-page-http",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"curl -s --max-time 15 http://127.0.0.1:8099/api/node-page"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "reprobe-workbench-meshcore-status",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-s",
+				"http://127.0.0.1:18098/api/gateways/meshcore"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "show-pi-17463-process",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ps -ef | grep 17463 | grep -v grep"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "show-pi-5040-sessions",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ss -tn | grep 5040"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "show-pi-runtime-journal-recent",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"journalctl -u meshcore-pi-live-runtime.service -n 60 --no-pager"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "kill-temp-pi-17463-pid",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"kill 20028"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-temp-pi-17463-gone",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ps -ef | grep 17463 | grep -v grep"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "recheck-pi-5040-sessions",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"ss -tn | grep 5040"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "final-pi-node-page-http",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"curl -s --max-time 15 http://127.0.0.1:8099/api/node-page"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "final-pi-local-7463-smoke",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"cd /home/n2dh/meshcore-pi-port/scripts; python3 run-gateway-link-smoke.py --host 127.0.0.1 --port 7463 --timeout 10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "final-workbench-meshcore-status",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-s",
+				"http://127.0.0.1:18098/api/gateways/meshcore"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "probe-pi-gateway-access",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"meshcorebasestation",
+				"curl -s --max-time 10 http://127.0.0.1:8099/api/gateway/access"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-served-workbench-js",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-s",
+				"http://127.0.0.1:18098/workbench-preview.js"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "validate-rcs-authority-lookup",
+			"type": "shell",
+			"command": "d:\\Projects\\meshcore-pi-port\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\Projects\\meshcore-pi-port\\.tmp_validate_rcs_lookup.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "validate-rcs-name-lookup",
+			"type": "shell",
+			"command": "d:\\Projects\\meshcore-pi-port\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\Projects\\meshcore-pi-port\\.tmp_validate_rcs_name_lookup.py"
+			],
+			"isBackground": false
+		}
+	]
+}

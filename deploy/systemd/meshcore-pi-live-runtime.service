@@ -1,0 +1,19 @@
+[Unit]
+Description=MeshCore Pi Live Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/meshcore-pi-port
+Environment=MESHCORE_PI_INTERFACE_MODE=app
+Environment=MESHCORE_PI_RUNTIME_ENDPOINT=tcp://127.0.0.1:5041
+Environment=MESHCORE_PI_STORAGE_ROOT=/var/lib/meshcore-pi-port
+Environment=MESHCORE_PI_LIVE_RUNTIME_BIN=/opt/meshcore-pi-port/bin/pi-live-runtime
+ExecStart=/usr/bin/env python3 /opt/meshcore-pi-port/scripts/run-pi-companion-service.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

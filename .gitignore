@@ -17,3 +17,13 @@ compile_commands.json
 .venv/
 venv/
 platformio.local.ini
+
+# Scratch and generated
+.tmp_*
+__pycache__/
+*.py[cod]
+var/
+probe_send_sites.txt
+.vscode/tasks-test-placeholder.json
+/meshcore-pi-port/
+
