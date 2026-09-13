@@ -73,8 +73,16 @@ This keeps the runtime-owned native companion path, the Pi-hosted browser UI, an
 
 For more detail, see:
 
-1. [docs/pi_node_interface.md](./docs/pi_node_interface.md)
+1. [docs/PI_BROWSER_UI_MOVE_PLAN.md](./docs/PI_BROWSER_UI_MOVE_PLAN.md) for the service layout and live deployment notes
 2. [docs/pi_alpha_release.md](./docs/pi_alpha_release.md)
+
+## Relationship To The EHN Basestation
+
+This repository is the MeshCore gateway for the Emergency Ham Network. It owns the radio, the
+native companion protocol, the Pi-hosted node UI, and the basestation-facing gateway link on
+`7463`. It does not own identity, routing policy, or message storage; those live in the separate
+`ehn-basestation` repository, which connects to this node over the gateway link. Architecture
+and specifications are in `ehn-docs`.
 
 ## Telemetry
 
