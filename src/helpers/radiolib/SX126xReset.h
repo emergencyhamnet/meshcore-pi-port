@@ -2,25 +2,29 @@
 
 #include <RadioLib.h>
 
+#include "CustomSX1262.h"
+
 // Full receiver reset for all SX126x-family chips (SX1262, SX1268, LLCC68, STM32WLx).
 // Warm sleep powers down analog, Calibrate(0x7F) refreshes ADC/PLL/image calibration,
 // then re-applies RX settings that calibration may reset.
-inline void sx126xResetAGC(SX126x* radio) {
+inline void sx126xResetAGC(CustomSX1262* radio) {
   radio->sleep(true);
   radio->standby(RADIOLIB_SX126X_STANDBY_RC, true);
 
+  Module* module = radio->module();
+
   uint8_t calData = RADIOLIB_SX126X_CALIBRATE_ALL;
-  radio->mod->SPIwriteStream(RADIOLIB_SX126X_CMD_CALIBRATE, &calData, 1, true, false);
-  radio->mod->hal->delay(5);
-  uint32_t start = millis();
-  while (radio->mod->hal->digitalRead(radio->mod->getGpio())) {
-    if (millis() - start > 50) break;
-    radio->mod->hal->yield();
+  module->SPIwriteStream(RADIOLIB_SX126X_CMD_CALIBRATE, &calData, 1, true, false);
+  module->hal->delay(5);
+  uint32_t start = module->hal->millis();
+  while (module->hal->digitalRead(module->getGpio())) {
+    if (module->hal->millis() - start > 50) break;
+    module->hal->yield();
   }
 
   // Calibrate(0x7F) defaults image calibration to 902-928MHz band.
   // Re-calibrate for the actual operating frequency.
-  radio->calibrateImage(radio->freqMHz);
+  radio->calibrateImage(radio->trackedFrequencyMHz());
 
 #ifdef SX126X_DIO2_AS_RF_SWITCH
   radio->setDio2AsRfSwitch(SX126X_DIO2_AS_RF_SWITCH);

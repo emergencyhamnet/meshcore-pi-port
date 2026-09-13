@@ -2,6 +2,8 @@
 
 #include <RadioLib.h>
 
+#include <cstdio>
+
 #define SX126X_IRQ_HEADER_VALID                0b0000010000  //  4     4     valid LoRa header received
 #define SX126X_IRQ_PREAMBLE_DETECTED           0x04
 
@@ -11,8 +13,10 @@ class CustomSX1262 : public SX1262 {
 
   #ifdef RP2040_PLATFORM
     bool std_init(SPIClassRP2040* spi = NULL)
-  #else
+  #elif defined(ARDUINO)
     bool std_init(SPIClass* spi = NULL)
+  #else
+    bool std_init(void* spi = nullptr)
   #endif
     {
   #ifdef SX126X_DIO3_TCXO_VOLTAGE
@@ -27,7 +31,7 @@ class CustomSX1262 : public SX1262 {
       uint8_t cr = 5;
   #endif
 
-  #if defined(P_LORA_SCLK)
+  #if defined(P_LORA_SCLK) && defined(ARDUINO)
     #ifdef NRF52_PLATFORM
       if (spi) { spi->setPins(P_LORA_MISO, P_LORA_SCLK, P_LORA_MOSI); spi->begin(); }
     #elif defined(RP2040_PLATFORM)
@@ -49,10 +53,17 @@ class CustomSX1262 : public SX1262 {
         status = begin(LORA_FREQ, LORA_BW, LORA_SF, cr, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, LORA_TX_POWER, 16, tcxo);
       }
       if (status != RADIOLIB_ERR_NONE) {
+      #if defined(ARDUINO)
         Serial.print("ERROR: radio init failed: ");
         Serial.println(status);
+      #else
+        std::fprintf(stderr, "ERROR: radio init failed: %d\n", status);
+      #endif
         return false;  // fail
       }
+
+      tracked_frequency_mhz_ = LORA_FREQ;
+      tracked_spreading_factor_ = LORA_SF;
     
       setCRC(1);
   
@@ -65,7 +76,7 @@ class CustomSX1262 : public SX1262 {
   #ifdef SX126X_RX_BOOSTED_GAIN
       setRxBoostedGainMode(SX126X_RX_BOOSTED_GAIN);
   #endif
-  #if defined(SX126X_RXEN) || defined(SX126X_TXEN)
+  #if (defined(SX126X_RXEN) || defined(SX126X_TXEN)) && !defined(MESHCORE_PI_BOARD_OWNS_RF_SWITCH)
     #ifndef SX126X_RXEN
       #define SX126X_RXEN RADIOLIB_NC
     #endif
@@ -86,6 +97,27 @@ class CustomSX1262 : public SX1262 {
       return true;  // success
     }
 
+    void applyMeshParams(float freq, float bw, uint8_t sf, uint8_t cr) {
+      setFrequency(freq);
+      setBandwidth(bw);
+      setSpreadingFactor(sf);
+      setCodingRate(cr);
+      tracked_frequency_mhz_ = freq;
+      tracked_spreading_factor_ = sf;
+    }
+
+    float trackedFrequencyMHz() const {
+      return tracked_frequency_mhz_;
+    }
+
+    Module* module() {
+      return getMod();
+    }
+
+    uint8_t trackedSpreadingFactor() const {
+      return tracked_spreading_factor_;
+    }
+
     bool isReceiving() {
       uint16_t irq = getIrqFlags();
       bool detected = (irq & SX126X_IRQ_HEADER_VALID) || (irq & SX126X_IRQ_PREAMBLE_DETECTED);
@@ -97,4 +129,8 @@ class CustomSX1262 : public SX1262 {
       readRegister(RADIOLIB_SX126X_REG_RX_GAIN, &rxGain, 1);
       return (rxGain == RADIOLIB_SX126X_RX_GAIN_BOOSTED);
     }
+
+  private:
+    float tracked_frequency_mhz_ = LORA_FREQ;
+    uint8_t tracked_spreading_factor_ = LORA_SF;
 };

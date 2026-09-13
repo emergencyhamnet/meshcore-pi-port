@@ -3,12 +3,48 @@
 #include <MeshCore.h>
 #include <helpers/SensorManager.h>
 
+#if defined(MESHCORE_PI_LIVE_RADIO)
+
+#define RADIOLIB_STATIC_ONLY 1
+
+#include "platform/pi_board.h"
+#include "platform/pi_radiolib_hal.h"
+#include "src/helpers/radiolib/CustomSX1262Wrapper.h"
+
+class PiLiveBoard : public mesh::MainBoard {
+public:
+    void begin() {}
+
+    uint16_t getBattMilliVolts() override;
+    const char* getManufacturerName() const override { return "Raspberry Pi"; }
+    void reboot() override {}
+    uint8_t getStartupReason() const override { return BD_STARTUP_NORMAL; }
+    uint32_t getIRQGpio() override { return pi_port::board_profile().radio.dio1; }
+
+    void onBeforeTransmit() override {
+        pi_port::board_set_radio_path_mode(pi_port::RadioPathMode::transmit);
+    }
+
+    void onAfterTransmit() override {
+        pi_port::board_set_radio_path_mode(pi_port::RadioPathMode::receive);
+    }
+};
+
+extern PiLiveBoard board;
+extern CustomSX1262Wrapper radio_driver;
+extern SensorManager& sensors;
+
+bool radio_init();
+mesh::LocalIdentity radio_new_identity();
+
+#else
+
 class PiProbeBoard : public mesh::MainBoard {
 public:
     uint16_t getBattMilliVolts() override { return 0; }
     const char* getManufacturerName() const override { return "PiProbe"; }
     void reboot() override {}
-    uint8_t getStartupReason() const override { return mesh::BD_STARTUP_NORMAL; }
+    uint8_t getStartupReason() const override { return BD_STARTUP_NORMAL; }
 };
 
 class PiProbeRadioDriver : public mesh::Radio {
@@ -26,10 +62,17 @@ public:
     void setRxBoostedGainMode(uint8_t) {}
     bool getRxBoostedGainMode() const { return false; }
     long getRngSeed() const { return 1; }
+    float getLastSNR() const { return 0.0f; }
+    float getLastRSSI() const { return 0.0f; }
+    uint32_t getPacketsRecv() const { return 0; }
+    uint32_t getPacketsSent() const { return 0; }
+    uint32_t getPacketsRecvErrors() const { return 0; }
 };
 
 extern PiProbeBoard board;
 extern PiProbeRadioDriver radio_driver;
-extern SensorManager sensors;
+extern SensorManager& sensors;
 
 mesh::LocalIdentity radio_new_identity();
+
+#endif

@@ -18,7 +18,7 @@ DataStore::DataStore(FILESYSTEM& fs, mesh::RTCClock& clock) : _fs(&fs), _fsExtra
 {
 }
 
-#if defined(EXTRAFS) || defined(QSPIFLASH)
+#if defined(EXTRAFS) || defined(QSPIFLASH) || defined(__linux__)
 DataStore::DataStore(FILESYSTEM& fs, FILESYSTEM& fsExtra, mesh::RTCClock& clock) : _fs(&fs), _fsExtra(&fsExtra), _clock(&clock),
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
     identity_store(fs, "")
@@ -176,6 +176,12 @@ bool DataStore::formatFileSystem() {
   bool fs_success = ((fs::SPIFFSFS *)_fs)->format();
   esp_err_t nvs_err = nvs_flash_erase(); // no need to reinit, will be done by reboot
   return fs_success && (nvs_err == ESP_OK);
+#elif defined(__linux__)
+  if (_fsExtra == nullptr) {
+    return _fs->format();
+  } else {
+    return _fs->format() && _fsExtra->format();
+  }
 #else
   #error "need to implement format()"
 #endif

@@ -383,7 +383,9 @@ void MyMesh::onDiscoveredContact(ContactInfo &contact, bool is_new, uint8_t path
     p->path_len = mesh::Packet::copyPath(p->path, path, path_len);
   }
 
-  if (!is_new) dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY); // only schedule lazy write for contacts that are in contacts[]
+  dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY); // schedule lazy write for both new and updated contacts in contacts[]
+  saveContacts();
+  dirty_contacts_expiry = 0;
 }
 
 static int sort_by_recent(const void *a, const void *b) {
@@ -1993,7 +1995,8 @@ void MyMesh::handleCmdFrame(size_t len) {
 }
 
 static bool save_filter(const ContactInfo& c) {
-  return c.type != ADV_TYPE_NONE;   // don't save the transient/anon entries
+  (void)c;
+  return true;
 }
 
 void MyMesh::saveContacts() {

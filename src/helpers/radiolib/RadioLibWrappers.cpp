@@ -2,6 +2,8 @@
 #define RADIOLIB_STATIC_ONLY 1
 #include "RadioLibWrappers.h"
 
+#include <algorithm>
+
 #define STATE_IDLE       0
 #define STATE_RX         1
 #define STATE_TX_WAIT    3
@@ -209,5 +211,5 @@ float RadioLibWrapper::packetScoreInt(float snr, int sf, int packet_len) {
   auto success_rate_based_on_snr = (snr - snr_threshold[sf - 7]) / 10.0;
   auto collision_penalty = 1 - (packet_len / 256.0);   // Assuming max packet of 256 bytes
 
-  return max(0.0, min(1.0, success_rate_based_on_snr * collision_penalty));
+  return std::max(0.0, std::min(1.0, success_rate_based_on_snr * collision_penalty));
 }

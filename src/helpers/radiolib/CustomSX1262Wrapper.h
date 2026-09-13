@@ -13,10 +13,7 @@ public:
   CustomSX1262Wrapper(CustomSX1262& radio, mesh::MainBoard& board) : RadioLibWrapper(radio, board) { }
 
   void setParams(float freq, float bw, uint8_t sf, uint8_t cr) override {
-    ((CustomSX1262 *)_radio)->setFrequency(freq);
-    ((CustomSX1262 *)_radio)->setSpreadingFactor(sf);
-    ((CustomSX1262 *)_radio)->setBandwidth(bw);
-    ((CustomSX1262 *)_radio)->setCodingRate(cr);
+    ((CustomSX1262 *)_radio)->applyMeshParams(freq, bw, sf, cr);
     updatePreamble(sf);
   }
 
@@ -30,15 +27,15 @@ public:
   float getLastSNR() const override { return ((CustomSX1262 *)_radio)->getSNR(); }
 
   float packetScore(float snr, int packet_len) override {
-    int sf = ((CustomSX1262 *)_radio)->spreadingFactor;
+    int sf = ((CustomSX1262 *)_radio)->trackedSpreadingFactor();
     return packetScoreInt(snr, sf, packet_len);
   }
-  uint8_t getSpreadingFactor() const override { return ((CustomSX1262 *)_radio)->spreadingFactor; }
+  uint8_t getSpreadingFactor() const override { return ((CustomSX1262 *)_radio)->trackedSpreadingFactor(); }
   virtual void powerOff() override {
     ((CustomSX1262 *)_radio)->sleep(false);
   }
 
-  void doResetAGC() override { sx126xResetAGC((SX126x *)_radio); }
+  void doResetAGC() override { sx126xResetAGC((CustomSX1262 *)_radio); }
 
   void setRxBoostedGainMode(bool en) override {
     ((CustomSX1262 *)_radio)->setRxBoostedGainMode(en);

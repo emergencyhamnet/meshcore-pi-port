@@ -3,6 +3,8 @@
 #include <Mesh.h>
 #include <RadioLib.h>
 
+#include <cstdlib>
+
 class RadioLibWrapper : public mesh::Radio {
 protected:
   PhysicalLayer* _radio;
@@ -78,7 +80,11 @@ public:
 
   void random(uint8_t* dest, size_t sz) override {
     for (int i = 0; i < sz; i++) {
+    #if defined(ARDUINO)
       dest[i] = _radio->randomByte() ^ (::random(0, 256) & 0xFF);
+    #else
+      dest[i] = _radio->randomByte() ^ (std::rand() & 0xFF);
+    #endif
     }
   }
 };
