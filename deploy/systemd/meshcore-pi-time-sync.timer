@@ -1,0 +1,10 @@
+[Unit]
+Description=MeshCore Pi Time Sync Timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=meshcore-pi-time-sync.service
+
+[Install]
+WantedBy=timers.target
