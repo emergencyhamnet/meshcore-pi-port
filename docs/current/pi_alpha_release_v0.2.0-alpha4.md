@@ -2,10 +2,12 @@
 
 ## Status
 
-Unpublished alpha4 **test candidate**. This candidate is assembled from a dirty local
-`pi-port-main` working tree based on `5c9a2160`; it is not a tagged source revision and is not
-ready for a GitHub release. The exact archive hash must be recorded when the test bundle is
-built. Do not treat branch name or pre-existing live-service observations as release evidence.
+Unpublished alpha4 **test candidate**. The candidate is now a clean commit series on
+`pi-port-main`: base `5c9a2160`, candidate commit `96ebe5f2`, plus bring-up fixes
+`fc1baf8f` (missing time-sync timer template), `39d96d9c` (set-time helper port collision),
+`e9ddba38` (set-time already-synced tolerance) and `0447cb16` (boot-only time-sync timer).
+Hardware validation of `0447cb16` is recorded below. Not yet tagged or published; the exact
+archive hash must still be recorded when the release bundle is built.
 
 ## Highlights
 
@@ -29,15 +31,43 @@ built. Do not treat branch name or pre-existing live-service observations as rel
 
 - Pi-port unittest suite: 31 tests pass locally, including three hardware-free sampler tests.
 - Sampler syntax and shell installer/packager syntax checks pass locally.
-- The new sampler has not been installed or run on a Pi; no hardware readings or native
-	telemetry replies are validated by this candidate.
 - Prior Pi and EHN integration observations are historical and do not certify this candidate.
+
+## Hardware validation, 2026-10-30
+
+Commit `0447cb16` built from a fresh clone on a newly imaged node and passed the standalone
+acceptance checklist in `pi-port/standalone.md`:
+
+- Host: Raspberry Pi 3B, Raspberry Pi OS Lite 64-bit (Debian 13 trixie), aarch64,
+  kernel 6.18, g++ 14.2, Python 3.13, liblgpio-dev 0.2.2, RadioLib 7.7.1. **First 64-bit
+  build/run validation** (warnings only; previously only 32-bit was proven).
+- HAT: Issue 1.0 board, E22-900M33S; SHT40/ADS1015/LPS22HH all present on I2C1.
+- Clean build via `scripts/build-pi-live-runtime.sh`; `live_radio_ready=1`,
+  `live_runtime_ready=1`.
+- Runtime, browser UI and boot-only time-sync services survive reboot; node identity stable
+  across two reboots and multiple runtime restarts (no duplicate identities).
+- App-mode companion smoke test passes (`127.0.0.1:5040`).
+- Pi UI live operations verified over its API: set name, set radio params (persisted across
+  runtime restart), flood advert, channel/contact reads, direct message send.
+- RF acceptance with a second node (LilyGo T-Beam, same room, SNR ~11.75 both ways):
+  flood advert received by the T-Beam; incoming direct message received and decrypted on the
+  Pi; authorized reply delivered with recipient-side confirmation.
+- Standalone HAT sampler installed, enabled and producing fresh snapshots every 10 s
+  (temperature/humidity/pressure/VBAT; mode 0600). Native telemetry permissions remain 0.
+  Sensor accuracy/calibration against reference instruments is still unverified.
+- Root-owned state backup (`/var/lib/meshcore-pi-port`: identity, channels/contacts, prefs,
+  state) created and content-verified.
 
 ## Explicit limitations
 
+- The companion bridge serves **one client at a time**. The Pi browser UI holds the
+	`127.0.0.1:5040` session whenever its service is running, so a published MeshCore client
+	(or any smoke test) cannot connect until `meshcore-pi-browser-ui.service` is stopped. A
+	client connecting during session handover may receive one stale push frame.
 - Dummy snapshot values must not be presented as measured hardware values. The optional sampler
 	is separate from the runtime, and sensor accuracy/calibration and receiver-visible telemetry
-	remain unverified.
+	remain unverified. The onboard SHT40 reads board/enclosure temperature (~40 C observed on an
+	idle Pi 3B), not ambient.
 - Gateway acceptance is not RF delivery confirmation. A send timeout is ambiguous and must not be blindly retried.
 - The Pi UI `Check messages` controls reload broker-cached conversation history; they do not directly force a radio inbox sync. They remain for compatibility and may be removed or relabeled later.
 - Routine caches can miss contact/channel changes made through another client until manual Refresh or a reconnect performs discovery.
@@ -48,17 +78,13 @@ built. Do not treat branch name or pre-existing live-service observations as rel
 
 ## Release validation still required
 
-1. Decide and create a clean, reviewable commit from the intended candidate changes; preserve
-	unrelated local edits and record the exact donor MeshCore base.
-2. Build from a fresh clone of that exact commit on supported Pi hardware.
-3. Run the app-mode companion smoke test and gateway-link smoke test.
-4. Test standalone MeshCore compatibility and Pi UI behavior separately from EHN gateway-link
-	behavior.
-5. If testing HAT telemetry, install the sampler only by explicit opt-in, check calibrated
-	readings and file freshness, then review native telemetry permissions before a controlled
+1. Confirm the published MeshCore client connects through `127.0.0.1:5040` (stop the browser
+	UI service first; the bridge serves one client at a time).
+2. If claiming calibrated telemetry, compare sampler voltage/environment readings against
+	reference instruments and review native telemetry permissions before a controlled
 	request/reply test. Battery permission remains unsafe to claim until missing/stale VBAT
 	semantics are resolved.
-6. Confirm the published MeshCore client connects through `127.0.0.1:5040` and obtain
-	recipient-side evidence for authorized direct/group RF tests.
-7. Review source archive contents and hashes. Tag and publish only after clean-clone build,
-	hardware sign-off, release-note review and explicit approval.
+3. Review source archive contents and hashes. Tag and publish only after release-note review
+	and explicit approval. Clean-clone build and standalone hardware sign-off were completed
+	2026-10-30 (see Hardware validation above); EHN gateway-link behavior remains untested on
+	this candidate.
