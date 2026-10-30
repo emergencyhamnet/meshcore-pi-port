@@ -2,8 +2,10 @@
 Description=MeshCore Pi Time Sync Timer
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=15min
+; Boot-only: each sync run stops and restarts the live runtime (radio and
+; companion session drop briefly), and the Pi runtime clock follows the
+; NTP-disciplined host clock afterwards, so periodic resync is unnecessary.
+OnBootSec=3min
 Unit=meshcore-pi-time-sync.service
 
 [Install]
