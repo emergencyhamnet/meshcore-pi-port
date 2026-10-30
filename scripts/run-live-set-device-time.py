@@ -67,6 +67,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--connect-timeout", type=float, default=10.0)
     parser.add_argument("--reply-timeout", type=float, default=5.0)
     parser.add_argument("--post-ready-delay", type=float, default=0.5)
+    parser.add_argument(
+        "--already-synced-tolerance",
+        type=int,
+        default=int(os.environ.get("MESHCORE_PI_SET_TIME_TOLERANCE", "5")),
+        help="Accept the device clock as already synced when it is at or ahead of the "
+        "target by at most this many seconds instead of failing the sync.",
+    )
     return parser.parse_args()
 
 
@@ -241,6 +248,7 @@ def restore_serial_runtime(args: argparse.Namespace) -> None:
 
 def main() -> int:
     args = parse_args()
+    start_monotonic = time.monotonic()
     epoch_seconds = args.epoch_seconds if args.epoch_seconds is not None else int(time.time())
     endpoint = f"tcp://{args.host}:{args.port}"
     runtime_process: subprocess.Popen[bytes] | None = None
@@ -282,16 +290,27 @@ def main() -> int:
             expect_device_query(client_socket)
             expect_app_start(client_socket, args.app_name)
             device_before = get_device_time(client_socket)
-            set_device_time(client_socket, epoch_seconds)
-            device_after = get_device_time(client_socket)
+            # Advance the requested epoch by the time spent restarting the
+            # runtime; the donor rejects any time earlier than its current
+            # clock, and the Pi clock already follows host time by default.
+            target_epoch = epoch_seconds + int(time.monotonic() - start_monotonic)
+            skew_before = device_before - target_epoch
+            if 0 <= skew_before <= args.already_synced_tolerance:
+                device_after = device_before
+                action = "already synced"
+            else:
+                set_device_time(client_socket, target_epoch)
+                device_after = get_device_time(client_socket)
+                action = "set"
 
             print("Live device time sync passed.")
             print(f"Temporary endpoint: {endpoint}")
-            print(f"Epoch seconds: {epoch_seconds}")
-            print(f"UTC: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(epoch_seconds))}")
+            print(f"Action: {action}")
+            print(f"Epoch seconds: {target_epoch}")
+            print(f"UTC: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(target_epoch))}")
             print(f"Device before: {device_before}")
             print(f"Device after: {device_after}")
-            print(f"Skew after sync: {device_after - epoch_seconds}")
+            print(f"Skew after sync: {device_after - target_epoch}")
             return 0
         except Exception as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
