@@ -78,8 +78,11 @@ mechanism.
 The browser UI reports native `base`, `location` and `environment` telemetry modes. These are
 MeshCore node settings, independent from sampler service state:
 
-- `environment` permission gates temperature, humidity and pressure replies.
-- `base` permission includes battery voltage and other base telemetry.
+- **`base` permission is required for any telemetry reply at all**: the donor companion code
+  only responds to a telemetry request when the base permission bit is granted
+  (`MyMesh::onContactRequest`). Base replies include battery voltage.
+- `environment` permission adds temperature, humidity and pressure to the reply; it produces
+  no reply on its own without `base`.
 - `location` permission is separate and is not required for these HAT readings.
 
 Keep permissions at their existing value until the operator explicitly chooses which contacts

@@ -53,8 +53,12 @@ acceptance checklist in `pi-port/standalone.md`:
   flood advert received by the T-Beam; incoming direct message received and decrypted on the
   Pi; authorized reply delivered with recipient-side confirmation.
 - Standalone HAT sampler installed, enabled and producing fresh snapshots every 10 s
-  (temperature/humidity/pressure/VBAT; mode 0600). Native telemetry permissions remain 0.
-  Sensor accuracy/calibration against reference instruments is still unverified.
+  (temperature/humidity/pressure/VBAT; mode 0600). **Controlled RF telemetry request/reply
+  verified**: with base+environment permissions set to allow-all (location denied), a telemetry
+  request from the T-Beam returned battery voltage, temperature, relative humidity and pressure
+  sourced from the live HAT sensors. Note donor semantics: base permission is required for any
+  telemetry reply; environment alone never responds. Sensor accuracy/calibration against
+  reference instruments is still unverified.
 - Root-owned state backup (`/var/lib/meshcore-pi-port`: identity, channels/contacts, prefs,
   state) created and content-verified.
 
@@ -81,9 +85,9 @@ acceptance checklist in `pi-port/standalone.md`:
 1. Confirm the published MeshCore client connects through `127.0.0.1:5040` (stop the browser
 	UI service first; the bridge serves one client at a time).
 2. If claiming calibrated telemetry, compare sampler voltage/environment readings against
-	reference instruments and review native telemetry permissions before a controlled
-	request/reply test. Battery permission remains unsafe to claim until missing/stale VBAT
-	semantics are resolved.
+	reference instruments. RF telemetry request/reply was verified 2026-10-30 with
+	base+environment allow-all on a node with a live VBAT reading; the missing/stale-VBAT
+	zero-reading caveat still applies to nodes without a battery sense input.
 3. Review source archive contents and hashes. Tag and publish only after release-note review
 	and explicit approval. Clean-clone build and standalone hardware sign-off were completed
 	2026-10-30 (see Hardware validation above); EHN gateway-link behavior remains untested on
