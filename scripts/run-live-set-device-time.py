@@ -31,7 +31,15 @@ def parse_args() -> argparse.Namespace:
         description="Set the live Pi donor runtime device clock via the companion protocol over a temporary localhost TCP endpoint."
     )
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5040)
+    parser.add_argument(
+        "--port",
+        type=int,
+        # Must not reuse the deployed bridge port (5040): active companion
+        # clients such as the browser UI reconnect to it while the managed
+        # runtime is stopped and would be accepted instead of the temporary
+        # runtime this helper launches.
+        default=int(os.environ.get("MESHCORE_PI_SET_TIME_PORT", "5042")),
+    )
     parser.add_argument(
         "--epoch-seconds",
         type=int,
