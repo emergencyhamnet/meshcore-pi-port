@@ -2,12 +2,11 @@
 
 ## Status
 
-Unpublished alpha4 **test candidate**. The candidate is now a clean commit series on
-`pi-port-main`: base `5c9a2160`, candidate commit `96ebe5f2`, plus bring-up fixes
-`fc1baf8f` (missing time-sync timer template), `39d96d9c` (set-time helper port collision),
-`e9ddba38` (set-time already-synced tolerance) and `0447cb16` (boot-only time-sync timer).
-Hardware validation of `0447cb16` is recorded below. Not yet tagged or published; the exact
-archive hash must still be recorded when the release bundle is built.
+Released alpha4 tag `v0.2.0-alpha4` on `pi-port-main`. The candidate is a clean commit series:
+base `5c9a2160`, candidate commit `96ebe5f2`, bring-up fixes `fc1baf8f` (missing time-sync
+timer template), `39d96d9c` (set-time helper port collision), `e9ddba38` (set-time
+already-synced tolerance), `0447cb16` (boot-only time-sync timer), plus documentation of the
+hardware validation recorded below.
 
 ## Highlights
 
@@ -48,7 +47,8 @@ acceptance checklist in `pi-port/standalone.md`:
   across two reboots and multiple runtime restarts (no duplicate identities).
 - App-mode companion smoke test passes (`127.0.0.1:5040`).
 - Pi UI live operations verified over its API: set name, set radio params (persisted across
-  runtime restart), flood advert, channel/contact reads, direct message send.
+  runtime restart), flood advert, channel/contact reads, direct message send. Browser access
+  at `http://<pi-host>:8099` confirmed by the operator.
 - RF acceptance with a second node (LilyGo T-Beam, same room, SNR ~11.75 both ways):
   flood advert received by the T-Beam; incoming direct message received and decrypted on the
   Pi; authorized reply delivered with recipient-side confirmation.

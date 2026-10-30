@@ -62,7 +62,11 @@ sudo apt install -y build-essential git cmake python3 python3-pip libssl-dev pkg
 
 `liblgpio-dev` is in the Raspberry Pi OS repositories (trixie and bookworm) and provides both `/usr/include/lgpio.h` and the runtime library. If your distribution lacks it, build `lg` from https://github.com/joan2937/lg.
 
-Reference node that is known to build and run: Raspberry Pi OS trixie (32-bit), g++ 14.2, Python 3.13, `liblgpio-dev` 0.2.2, RadioLib 7.7.1.
+Reference nodes that are known to build and run:
+
+1. Raspberry Pi OS trixie (32-bit), g++ 14.2, Python 3.13, `liblgpio-dev` 0.2.2, RadioLib 7.7.1.
+2. Raspberry Pi OS Lite trixie (64-bit, aarch64) on a Pi 3B, g++ 14.2, Python 3.13,
+   `liblgpio-dev` 0.2.2, RadioLib 7.7.1 — validated 2026-10-30 with the v0.2.0-alpha4 release.
 
 ## RadioLib Requirement
 
@@ -105,7 +109,7 @@ To work from GitHub source directly, clone the verified alpha tag. Earlier alpha
 The next candidate release notes are in `docs/pi_alpha_release_v0.2.0-alpha4.md`; use the candidate commit only after its fresh-clone validation is complete.
 
 ```bash
-sudo git clone --branch v0.2.0-alpha3 https://github.com/emergencyhamnet/meshcore-pi-port.git /opt/meshcore-pi-port
+sudo git clone --branch v0.2.0-alpha4 https://github.com/emergencyhamnet/meshcore-pi-port.git /opt/meshcore-pi-port
 sudo chown -R "$USER":"$USER" /opt/meshcore-pi-port
 cd /opt/meshcore-pi-port
 ```
@@ -115,8 +119,8 @@ cd /opt/meshcore-pi-port
 To work from a source release archive instead:
 
 ```bash
-tar -xzf meshcore-pi-port-v0.2.0-alpha3-source.tar.gz
-cd meshcore-pi-port-v0.2.0-alpha3-source
+tar -xzf meshcore-pi-port-v0.2.0-alpha4-source.tar.gz
+cd meshcore-pi-port-v0.2.0-alpha4-source
 ```
 
 Optional but useful for standalone validation:
@@ -202,6 +206,24 @@ sudo systemctl status meshcore-pi-browser-ui.service --no-pager
 
 The browser UI service also hosts the basestation gateway link on `0.0.0.0:7463` through the same native session, so the separate `meshcore-pi-gateway-link.service` is not needed in this layout.
 
+Install the boot-time node clock sync (the Pi 3B/4 has no battery-backed RTC; the node clock
+follows the NTP-disciplined host clock and this service confirms it shortly after boot):
+
+```bash
+sudo bash scripts/install-pi-time-sync-service.sh
+sudo systemctl start meshcore-pi-time-sync.timer
+```
+
+Optionally install the standalone HAT sensor sampler (separate opt-in service; see
+`docs/current/pi-port/telemetry.md` before enabling it or granting telemetry permissions):
+
+```bash
+sudo apt install -y python3-smbus2
+sudo bash scripts/install-pi-hat-sensors-service.sh
+# review the unit, then enable explicitly:
+sudo systemctl enable --now meshcore-pi-hat-sensors.service
+```
+
 Expected app-mode endpoints:
 
 1. published MeshCore app bridge: `127.0.0.1:5040`
@@ -218,6 +240,16 @@ After installation, validate in this order:
 3. `python3 scripts/run-native-companion-smoke.py --host 127.0.0.1 --port 5040`
 4. published MeshCore app connection through `127.0.0.1:5040`
 5. self telemetry readback using the dummy snapshot or live telemetry provider
+
+**Important:** the companion bridge serves one client at a time, and the browser UI service
+holds the `127.0.0.1:5040` session whenever it is running. Stop it before the smoke test or a
+published-app connection, then restart it:
+
+```bash
+sudo systemctl stop meshcore-pi-browser-ui.service
+python3 scripts/run-native-companion-smoke.py --host 127.0.0.1 --port 5040
+sudo systemctl start meshcore-pi-browser-ui.service
+```
 
 Optional extra checks:
 
@@ -241,14 +273,16 @@ Record every step where you had to deviate from this document; that list is the 
 
 ### Before you start
 
-1. Flash Raspberry Pi OS. 32-bit is the proven configuration; 64-bit is the intended future and should build but has not been validated yet. If you try 64-bit and hit anything architecture-specific, switch to 32-bit rather than debugging on the spot.
-2. Enable SSH and SPI, join the network, note the IP address, and give the host a distinct hostname such as `ehn-node-2`.
+1. Flash Raspberry Pi OS. Both 32-bit and 64-bit (aarch64) are validated configurations as of
+   v0.2.0-alpha4; the Lite image is sufficient.
+2. Enable SSH, SPI and I2C (I2C is needed for the optional HAT sensor sampler), join the
+   network, note the IP address, and give the host a distinct hostname such as `ehn-node-2`.
 3. Fit the HAT with power off, following `docs/pi_hat_pinout.md`. Confirm `/dev/spidev0.0` and `/dev/gpiochip0` exist after boot.
 
 ### Build and install
 
 1. Install the build dependencies and `RadioLib` as described above.
-2. Clone `v0.2.0-alpha3` into `/opt/meshcore-pi-port`.
+2. Clone `v0.2.0-alpha4` into `/opt/meshcore-pi-port`.
 3. Run `scripts/build-pi-live-runtime.sh`. Expect roughly 2 to 5 minutes and zero `error` lines. On a Pi 3B+ this took 2m14s.
 4. Install the runtime service in `app` mode, then the browser UI service with `MESHCORE_PI_BROWSER_UI_GATEWAY_LINK_ALLOW_TX=1`.
 5. Do not run any radio smoke test while another node with the same identity is on the air; a fresh node has a fresh identity, so this is only a concern if state was copied.

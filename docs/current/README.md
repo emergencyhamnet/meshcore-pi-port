@@ -16,7 +16,8 @@ hardware before following an installation procedure.
 2. [Radio pinout summary](pi_hat_pinout.md): supported SX1262-family radio mapping.
 3. [Build, install and release workflow](pi_install_build_release.md): practical Pi build and operating steps; release/tag references still require reconciliation before publication.
 4. [Alpha scope](pi_alpha_release.md): standalone donor-companion contract and limitations.
-5. [Alpha4 test candidate](pi_alpha_release_v0.2.0-alpha4.md): local candidate notes; not a published release or certified build.
+5. [Alpha4 release notes](pi_alpha_release_v0.2.0-alpha4.md): v0.2.0-alpha4 scope, hardware
+   validation evidence and known limitations.
 
 ## Operating Modes And Interfaces
 

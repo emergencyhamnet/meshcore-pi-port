@@ -1,6 +1,12 @@
 # Handover: Testing The Alpha Standalone MeshCore Pi HAT Port
 
-**Status:** handover document, 2026-10-30. Written from the local `pi-port-main` working tree.
+**Status:** completed 2026-10-30. All phases below were executed the same day on a fresh
+Pi 3B (64-bit): clean candidate commits, fresh-clone build, smoke tests, the full standalone
+acceptance checklist with recipient-confirmed RF tests, sampler enablement with a verified RF
+telemetry request/reply, and release preparation. Outcomes and evidence are recorded in
+[pi_alpha_release_v0.2.0-alpha4.md](../current/pi_alpha_release_v0.2.0-alpha4.md). This
+document is retained as the test-plan record.
+
 **Audience:** the next engineer/session taking over validation of the standalone Pi HAT port.
 **Next project:** take the unpublished **v0.2.0-alpha4 test candidate** through standalone
 testing on real Pi HAT hardware and, only after sign-off, through release packaging.
