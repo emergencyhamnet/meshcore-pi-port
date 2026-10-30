@@ -102,6 +102,7 @@ That early failure is intentional so packaging and release builds do not silentl
 ## Clone And Prepare
 
 To work from GitHub source directly, clone the verified alpha tag. Earlier alpha tags (`v0.2.0-alpha1`, `v0.2.0-alpha2`, `v0.1.0-alpha1`) do not build from a clean clone.
+The next candidate release notes are in `docs/pi_alpha_release_v0.2.0-alpha4.md`; use the candidate commit only after its fresh-clone validation is complete.
 
 ```bash
 sudo git clone --branch v0.2.0-alpha3 https://github.com/emergencyhamnet/meshcore-pi-port.git /opt/meshcore-pi-port
@@ -142,7 +143,8 @@ What this produces:
 
 1. native Pi runtime binary at `bin/pi-live-runtime` by default
 2. object files under `.build/pi-live-runtime`
-3. storage directories under `/var/lib/meshcore-pi-port` unless overridden
+
+The build is compile-only and does not require write access to `/var/lib/meshcore-pi-port`. Runtime storage directories are created by the service installer.
 
 If you want the binary somewhere else, set:
 
@@ -275,22 +277,22 @@ Running the original node behind the original basestation profile and the new no
 To generate a source release archive:
 
 ```bash
-scripts/package-pi-alpha-release.sh v0.2.0-alpha3
+scripts/package-pi-alpha-release.sh v0.2.0-alpha4
 ```
 
 Artifacts are written to `dist/` by default.
 
 Generated outputs:
 
-1. `meshcore-pi-port-v0.2.0-alpha3-source.tar.gz`
-2. `meshcore-pi-port-v0.2.0-alpha3-pi-binary.tar.gz` if `bin/pi-live-runtime` already exists and is executable
+1. `meshcore-pi-port-v0.2.0-alpha4-source.tar.gz`
+2. `meshcore-pi-port-v0.2.0-alpha4-pi-binary.tar.gz` if `bin/pi-live-runtime` already exists and is executable
 
 Recommended release build sequence on the Pi host:
 
 ```bash
 python3 scripts/write-dummy-telemetry-snapshot.py
 scripts/build-pi-live-runtime.sh
-scripts/package-pi-alpha-release.sh v0.2.0-alpha3
+scripts/package-pi-alpha-release.sh v0.2.0-alpha4
 ```
 
 ## Release Checklist
@@ -309,9 +311,9 @@ Before publishing a Pi alpha release:
 Suggested publish sequence:
 
 ```bash
-git tag v0.2.0-alpha3
+git tag v0.2.0-alpha4
 git push origin pi-port-main
-git push origin v0.2.0-alpha3
+git push origin v0.2.0-alpha4
 ```
 
 Then use:
@@ -330,6 +332,21 @@ Common build blockers:
 5. `delay was not declared` or `FILESYSTEM does not name a type`: the tree is missing the Pi patches to `Arduino.h`, `target.h`, `src/helpers/IdentityStore.h`, or `src/helpers/radiolib/`; check out `v0.2.0-alpha3` or later rather than an older tag
 
 If a long-lived working tree builds but a fresh clone does not, compare them with `scripts/pi-drift-report.sh` and `scripts/pi-reconcile-bundle.sh`, which ignore line-ending noise and list real content differences.
+
+Common runtime blockers:
+
+1. basestation shows the MeshCore gateway connected but writes disabled, or sends fail with `Basestation-directed transmit is disabled for this gateway-link server.`: the browser UI service was installed without `MESHCORE_PI_BROWSER_UI_GATEWAY_LINK_ALLOW_TX=1` (the unit template ships with `0`). Make it persistent on an installed node with:
+
+   ```bash
+   sudo systemctl edit meshcore-pi-browser-ui.service
+   # add:
+   # [Service]
+   # Environment=MESHCORE_PI_BROWSER_UI_GATEWAY_LINK_ALLOW_TX=1
+   sudo systemctl restart meshcore-pi-browser-ui.service
+   systemctl show meshcore-pi-browser-ui.service -p Environment | tr ' ' '\n' | grep ALLOW_TX
+   ```
+
+   Found on 2026-09-27 when a second basestation host took over the reference Pi 3B+ node.
 
 Start with:
 

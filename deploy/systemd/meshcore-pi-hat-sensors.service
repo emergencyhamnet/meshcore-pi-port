@@ -1,0 +1,24 @@
+[Unit]
+Description=MeshCore Pi HAT Sensor Sampler
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+User=meshcore-pi-sensors
+Group=meshcore-pi-sensors
+SupplementaryGroups=i2c
+WorkingDirectory=/opt/meshcore-pi-port
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/meshcore-pi-port/scripts/pi_hat_sensor_sampler.py --path /tmp/meshcore-pi-telemetry.env --interval 10
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

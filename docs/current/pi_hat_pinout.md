@@ -1,6 +1,8 @@
 # Pi HAT Radio Pinout
 
 This document records the current Raspberry Pi HAT radio wiring expected by the Pi-native MeshCore port.
+For the complete J1-J8 connector map, sensors/ADC dividers, watchdog/output signals and software
+interface, see the [Pi HAT Hardware And Software Interface](pi_hat_hardware_spec.md).
 
 ## Current Target Radio Family
 

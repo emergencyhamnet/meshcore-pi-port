@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 import secrets
 import threading
 import time
+from collections.abc import Iterable
 from typing import Any
 
 from .companion_client import (
@@ -154,6 +155,8 @@ class NativeSessionBroker:
         self._worker = threading.Thread(target=self._run, name="meshcore-web-session", daemon=True)
         self._client: MeshCoreNativeTcpClient | None = None
         self._contact_keys_by_prefix: dict[str, str] = {}
+        self._contacts_cache: list[dict[str, Any]] | None = None
+        self._active_channel_indices: set[int] | None = None
 
     def start(self) -> None:
         self._worker.start()
@@ -174,8 +177,8 @@ class NativeSessionBroker:
                 self._events_condition.wait(timeout=remaining)
             return [event for event in self._events if int(event["id"]) > last_event_id]
 
-    def collect_node_page(self) -> dict[str, Any]:
-        model = self._execute(self._collect_node_page_locked)
+    def collect_node_page(self, *, refresh_channels: bool = False) -> dict[str, Any]:
+        model = self._execute(lambda client: self._collect_node_page_locked(client, refresh_channels=refresh_channels))
         return {"ok": True, "node_page": model}
 
     def collect_session_snapshot(self) -> dict[str, Any]:
@@ -183,7 +186,6 @@ class NativeSessionBroker:
 
     def list_activity(self, *, limit: int = 50, direction: str | None = None) -> list[dict[str, Any]]:
         def operation(client: MeshCoreNativeTcpClient) -> list[dict[str, Any]]:
-            self._drain_messages_locked(client)
             rows = self._collect_activity_locked()
             if direction:
                 normalized = str(direction).strip().lower()
@@ -269,11 +271,13 @@ class NativeSessionBroker:
             contact_code = str(body.get("contact_code") or "").strip()
             if contact_code:
                 client.import_contact_code(contact_code)
+                self._contacts_cache = None
                 return {"ok": True, "mode": "import"}
             client.add_or_update_contact(
                 public_key_hex=str(body["public_key_hex"]),
                 name=str(body["name"]),
             )
+            self._contacts_cache = None
             return {"ok": True, "mode": "manual"}
 
         return self._execute(operation)
@@ -282,10 +286,7 @@ class NativeSessionBroker:
         normalized_public_key = str(public_key).strip().lower()
 
         def operation(client: MeshCoreNativeTcpClient) -> dict[str, Any]:
-            self._drain_messages_locked(client)
-            model = self._collect_node_page_locked(client)
-            contacts = [contact for contact in model.get("contacts", []) if isinstance(contact, dict)]
-            if not any(str(contact.get("public_key") or "").lower() == normalized_public_key for contact in contacts):
+            if not self._contact_is_configured_locked(client, normalized_public_key):
                 raise ValueError("contact is not configured")
             return {"ok": True, "messages": self._contact_history.get(normalized_public_key, [])}
 
@@ -298,9 +299,7 @@ class NativeSessionBroker:
             raise ValueError("message text must not be empty")
 
         def operation(client: MeshCoreNativeTcpClient) -> dict[str, Any]:
-            model = self._collect_node_page_locked(client)
-            contacts = [contact for contact in model.get("contacts", []) if isinstance(contact, dict)]
-            if not any(str(contact.get("public_key") or "").lower() == normalized_public_key for contact in contacts):
+            if not self._contact_is_configured_locked(client, normalized_public_key):
                 raise ValueError("contact is not configured")
             send_result = client.send_direct_text_message(public_key_prefix_hex=normalized_public_key[:12], text=text)
             sent_at = int(time.time())
@@ -314,22 +313,19 @@ class NativeSessionBroker:
             )
             _append_contact_history(self._contact_history, entry)
             self._publish_locked("contact-message", entry)
-            self._drain_messages_locked(client)
             return {
                 "ok": True,
                 "messages": self._contact_history.get(normalized_public_key, []),
                 "send_result": asdict(send_result),
             }
 
-        return self._execute(operation)
+        return self._execute(operation, process_notifications=False)
 
     def clear_contact_messages(self, public_key: str) -> dict[str, Any]:
         normalized_public_key = str(public_key).strip().lower()
 
         def operation(client: MeshCoreNativeTcpClient) -> dict[str, Any]:
-            model = self._collect_node_page_locked(client)
-            contacts = [contact for contact in model.get("contacts", []) if isinstance(contact, dict)]
-            if not any(str(contact.get("public_key") or "").lower() == normalized_public_key for contact in contacts):
+            if not self._contact_is_configured_locked(client, normalized_public_key):
                 raise ValueError("contact is not configured")
             self._contact_history.pop(normalized_public_key, None)
             return {"ok": True, "public_key": normalized_public_key}
@@ -344,7 +340,7 @@ class NativeSessionBroker:
             else:
                 name = str(body["name"]).strip()
                 secret_hex = str(body.get("secret_hex") or secrets.token_hex(16)).strip()
-            model = self._collect_node_page_locked(client)
+            model = self._collect_node_page_locked(client, refresh_channels=True)
             active_indices = {
                 int(channel.get("index", -1))
                 for channel in model.get("channels", [])
@@ -355,6 +351,8 @@ class NativeSessionBroker:
             if free_index is None:
                 raise ValueError("no free channel slots are available")
             client.set_channel(index=free_index, name=name, secret_hex=secret_hex)
+            self._active_channel_indices = self._active_channel_indices or set()
+            self._active_channel_indices.add(free_index)
             return {
                 "ok": True,
                 "channel": {
@@ -374,6 +372,8 @@ class NativeSessionBroker:
             if not name:
                 raise ValueError("channel name must not be empty")
             client.set_channel(index=channel_index, name=name, secret_hex=secret_hex)
+            self._active_channel_indices = self._active_channel_indices or set()
+            self._active_channel_indices.add(channel_index)
             return {
                 "ok": True,
                 "channel": {
@@ -391,6 +391,8 @@ class NativeSessionBroker:
             if channel_index == 0:
                 raise ValueError("public channel cannot be removed")
             client.remove_channel(channel_index)
+            if self._active_channel_indices is not None:
+                self._active_channel_indices.discard(channel_index)
             self._channel_history.pop(channel_index, None)
             return {"ok": True, "channel_index": channel_index}
 
@@ -398,12 +400,7 @@ class NativeSessionBroker:
 
     def get_channel_messages(self, channel_index: int) -> dict[str, Any]:
         def operation(client: MeshCoreNativeTcpClient) -> dict[str, Any]:
-            self._drain_messages_locked(client)
-            model = self._collect_node_page_locked(client)
-            active_channels = [
-                channel for channel in model.get("channels", []) if isinstance(channel, dict) and _is_active_channel(channel)
-            ]
-            if not any(int(channel.get("index", -1)) == channel_index for channel in active_channels):
+            if self._active_channel_indices is None or channel_index not in self._active_channel_indices:
                 raise ValueError(f"channel {channel_index} is not active")
             return {"ok": True, "messages": self._channel_history.get(channel_index, [])}
 
@@ -434,14 +431,13 @@ class NativeSessionBroker:
                     "text": text,
                 },
             )
-            self._drain_messages_locked(client)
             return {
                 "ok": True,
                 "messages": self._channel_history.get(channel_index, []),
                 "send_result": asdict(send_result),
             }
 
-        return self._execute(operation)
+        return self._execute(operation, process_notifications=False)
 
     def reboot(self) -> dict[str, Any]:
         return self._execute(lambda client: {"ok": True} if client.reboot() else {"ok": False})
@@ -452,6 +448,7 @@ class NativeSessionBroker:
                 continue
             try:
                 client = self._ensure_client_locked()
+                self._process_notifications_locked(client)
                 payload = client.read_next_frame(timeout_seconds=0.2)
                 if payload is None:
                     continue
@@ -462,12 +459,13 @@ class NativeSessionBroker:
             finally:
                 self._lock.release()
 
-    def _execute(self, operation):
+    def _execute(self, operation, *, process_notifications: bool = True):
         with self._lock:
             client = self._ensure_client_locked()
             try:
                 result = operation(client)
-                self._process_notifications_locked(client)
+                if process_notifications:
+                    self._process_notifications_locked(client)
                 return result
             except CompanionDeviceError:
                 raise
@@ -475,28 +473,86 @@ class NativeSessionBroker:
                 self._close_client_locked()
                 raise
 
-    def _collect_snapshot_locked(self, client: MeshCoreNativeTcpClient | None = None) -> dict[str, Any]:
+    def _collect_snapshot_locked(
+        self,
+        client: MeshCoreNativeTcpClient | None = None,
+        *,
+        refresh_channels: bool = False,
+    ) -> dict[str, Any]:
         active_client = client if client is not None else self._ensure_client_locked()
+        include_contacts = refresh_channels or self._contacts_cache is None
+        channel_indices = None
+        if not refresh_channels and self._active_channel_indices is not None:
+            channel_indices = sorted(self._active_channel_indices | {0})
         snapshot = active_client.collect_session_snapshot(
             app_name=str(self._native_config["app_name"]),
             protocol_version=int(self._native_config["protocol_version"]),
+            include_contacts=include_contacts,
+            channel_indices=channel_indices,
         )
         self._process_notifications_locked(active_client)
-        self._contact_keys_by_prefix = {
-            str(contact.get("public_key") or "")[:12]: str(contact.get("public_key") or "")
-            for contact in snapshot.get("contacts", [])
-            if isinstance(contact, dict) and contact.get("public_key")
-        }
+        if include_contacts:
+            self._update_contact_cache(snapshot.get("contacts", []))
+        else:
+            snapshot["contacts"] = list(self._contacts_cache or [])
+        max_channels = int((snapshot.get("device_info") or {}).get("max_channels") or 0)
+        queried_indices = range(max_channels) if channel_indices is None else channel_indices
+        self._update_channel_cache(snapshot.get("channels", []), queried_indices, replace=channel_indices is None)
         return snapshot
 
-    def _collect_node_page_locked(self, client: MeshCoreNativeTcpClient | None = None) -> dict[str, Any]:
-        snapshot = self._collect_snapshot_locked(client)
+    def _collect_node_page_locked(
+        self,
+        client: MeshCoreNativeTcpClient | None = None,
+        *,
+        refresh_channels: bool = False,
+    ) -> dict[str, Any]:
+        snapshot = self._collect_snapshot_locked(client, refresh_channels=refresh_channels)
         model = build_node_page_model(snapshot).to_dict()
         return _augment_model_with_activity(
             model,
             contact_history=self._contact_history,
             channel_history=self._channel_history,
         )
+
+    def _update_contact_cache(self, contacts: list[Any]) -> None:
+        keys = []
+        cached_contacts = []
+        for contact in contacts:
+            public_key = contact.get("public_key") if isinstance(contact, dict) else getattr(contact, "public_key", None)
+            if public_key:
+                normalized_key = str(public_key)
+                keys.append(normalized_key)
+                if isinstance(contact, dict):
+                    cached_contacts.append(dict(contact))
+                elif is_dataclass(contact):
+                    cached_contacts.append(asdict(contact))
+                else:
+                    cached_contacts.append({"public_key": normalized_key})
+        self._contact_keys_by_prefix = {public_key[:12]: public_key for public_key in keys}
+        self._contacts_cache = cached_contacts
+
+    def _contact_is_configured_locked(self, client: MeshCoreNativeTcpClient, public_key: str) -> bool:
+        if self._contacts_cache is not None and public_key in self._contact_keys_by_prefix.values():
+            return True
+        contacts = client.get_contacts()
+        self._update_contact_cache(contacts)
+        return public_key in self._contact_keys_by_prefix.values()
+
+    def _update_channel_cache(
+        self,
+        channels: list[dict[str, Any] | None],
+        queried_indices: Iterable[int],
+        *,
+        replace: bool,
+    ) -> None:
+        active_indices = set() if replace or self._active_channel_indices is None else set(self._active_channel_indices)
+        for index in queried_indices:
+            channel = channels[index] if index < len(channels) else None
+            if isinstance(channel, dict) and _is_active_channel(channel):
+                active_indices.add(index)
+            else:
+                active_indices.discard(index)
+        self._active_channel_indices = active_indices
 
     def _collect_activity_locked(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -572,12 +628,15 @@ class NativeSessionBroker:
                 app_name=str(self._native_config["app_name"]),
                 protocol_version=int(self._native_config["protocol_version"]),
             )
+            self._client = client
+            self._update_contact_cache(snapshot.get("contacts", []))
+            max_channels = int((snapshot.get("device_info") or {}).get("max_channels") or 0)
+            self._update_channel_cache(snapshot.get("channels", []), range(max_channels), replace=True)
             auto_synced_time = False
             if _should_auto_sync_time(int(snapshot.get("device_time") or 0)):
                 client.set_device_time(int(time.time()))
                 auto_synced_time = True
             self._process_notifications_locked(client)
-            self._client = client
             self._publish_locked(
                 "session-status",
                 {
@@ -625,6 +684,7 @@ class NativeSessionBroker:
             self._publish_locked("log-frame", log_entry)
             return
         if packet_type == PACKET_ADVERTISEMENT:
+            self._contacts_cache = None
             self._publish_locked("advertisement", {"received_at": int(time.time())})
             return
         if packet_type == PACKET_ACK:

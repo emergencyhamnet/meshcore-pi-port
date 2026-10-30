@@ -635,8 +635,20 @@ class MeshCoreNativeTcpClient:
             self._raise_device_error(frame, f"GET_CHANNEL {index} failed")
         return parse_channel_info(frame)
 
-    def get_channels(self, max_channels: int) -> list[ChannelInfo | None]:
-        return [self.get_channel(index) for index in range(max(0, int(max_channels)))]
+    def get_channels(
+        self,
+        max_channels: int,
+        *,
+        indices: list[int] | None = None,
+    ) -> list[ChannelInfo | None]:
+        channel_count = max(0, int(max_channels))
+        channel_indices = range(channel_count) if indices is None else sorted(
+            {int(index) for index in indices if 0 <= int(index) < channel_count}
+        )
+        channels: list[ChannelInfo | None] = [None] * channel_count
+        for index in channel_indices:
+            channels[index] = self.get_channel(index)
+        return channels
 
     def get_battery_and_storage(self) -> BatteryInfo:
         return parse_battery_info(self._command(bytes([CMD_GET_BATT_AND_STORAGE]), expected={PACKET_BATTERY}))
@@ -773,13 +785,23 @@ class MeshCoreNativeTcpClient:
             messages.append(message)
         return messages
 
-    def collect_session_snapshot(self, *, app_name: str = "windows-native-ui", protocol_version: int = 3) -> dict[str, Any]:
+    def collect_session_snapshot(
+        self,
+        *,
+        app_name: str = "windows-native-ui",
+        protocol_version: int = 3,
+        include_contacts: bool = True,
+        channel_indices: list[int] | None = None,
+    ) -> dict[str, Any]:
         self_info = self.app_start(app_name=app_name)
         device_info = self.device_query(protocol_version=protocol_version)
         device_time = self.get_device_time()
-        contacts = [asdict(contact) for contact in self.get_contacts()]
+        contacts = [asdict(contact) for contact in self.get_contacts()] if include_contacts else []
         max_channels = device_info.max_channels or 0
-        channels = [asdict(channel) if channel is not None else None for channel in self.get_channels(max_channels)]
+        channels = [
+            asdict(channel) if channel is not None else None
+            for channel in self.get_channels(max_channels, indices=channel_indices)
+        ]
         battery = asdict(self.get_battery_and_storage())
         custom_vars: dict[str, str] = {}
         try:

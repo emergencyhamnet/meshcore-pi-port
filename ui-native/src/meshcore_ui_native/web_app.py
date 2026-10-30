@@ -601,14 +601,14 @@ HTML_PAGE = """<!doctype html>
             <button id=\"refresh-channel-messages\">Check messages</button>
           </div>
         </div>
-        <div id=\"channel-messages\" class=\"messages\"></div>
-        <div class=\"subtle-divider\"></div>
-        <div class=\"field\">
+        <div id=\"channel-messages\" class="messages"></div>
+        <div class="subtle-divider"></div>
+        <div class="field">
           <label for=\"channel-message-input\">Send to selected channel</label>
           <textarea id=\"channel-message-input\" placeholder=\"Type a channel message\"></textarea>
         </div>
-        <div class=\"row\">
-          <button id=\"send-channel-message\" class=\"primary\">Send message</button>
+        <div class="row">
+          <button id=\"send-channel-message\" class="primary">Send message</button>
         </div>
       </div>
     </section>
@@ -975,7 +975,6 @@ HTML_PAGE = """<!doctype html>
       try {
         const payload = await callApi('/api/gateway/access', 'POST', { allow_basestation_tx: allowBasestationTx });
         renderGatewayAccess(payload);
-        await refreshModel('Refreshing node state...');
         setStatus(allowBasestationTx ? 'Gateway transmit access enabled.' : 'Gateway transmit access disabled.');
       } catch (error) {
         setStatus(String(error));
@@ -1063,7 +1062,7 @@ HTML_PAGE = """<!doctype html>
         const lastMessageLine = contact.last_message_timestamp
           ? `Last message: ${formatTimestamp(contact.last_message_timestamp)} • ${formatMessageKind(contact.last_message_route, contact.last_message_direction)}`
           : 'Last message: No direct message history yet.';
-        item.innerHTML = `<strong>${contact.name || 'Unnamed contact'}</strong><div class=\"mono\">${contact.public_key}</div><div class=\"hint\">${lastMessageLine}</div>`;
+        item.innerHTML = `<strong>${contact.name || 'Unnamed contact'}</strong><div class="mono">${contact.public_key}</div><div class="hint">${lastMessageLine}</div>`;
         item.addEventListener('click', () => openContact(contact.public_key));
         contactsList.appendChild(item);
       });
@@ -1115,7 +1114,7 @@ HTML_PAGE = """<!doctype html>
         const lastMessageLine = channel.last_message_timestamp
           ? `Last message: ${formatTimestamp(channel.last_message_timestamp)}`
           : 'Last message: No channel traffic yet.';
-        button.innerHTML = `<span class=\"chip\">${channel.index}</span><strong>${channel.name || 'Unnamed channel'}</strong><div class=\"hint\">${lastMessageLine}</div>`;
+        button.innerHTML = `<span class="chip">${channel.index}</span><strong>${channel.name || 'Unnamed channel'}</strong><div class="hint">${lastMessageLine}</div>`;
         button.addEventListener('click', () => openChannel(channel.index));
         channelsList.appendChild(button);
       });
@@ -1397,17 +1396,19 @@ HTML_PAGE = """<!doctype html>
         if (payload.direction === 'incoming') {
           writeToolOutput(`Incoming channel message on slot ${payload.channel_index}.`);
         }
-        await refreshModel('Refreshing channel activity...');
         if (selectedChannelIndex !== null && payload.channel_index === selectedChannelIndex) {
-          await refreshChannelMessages('Refreshing channel after new traffic...');
+          await refreshChannelMessages('Updating selected channel...');
+        } else if (payload.direction === 'incoming') {
+          setStatus(`New traffic arrived on channel ${payload.channel_index}.`);
         }
       });
       liveEventSource.addEventListener('contact-message', async event => {
         const payload = JSON.parse(event.data);
         writeToolOutput(`Incoming direct message for ${payload.public_key_ref.slice(0, 12)}.`);
-        await refreshModel('Refreshing contact activity...');
         if (selectedContactKey !== null && payload.public_key_ref === selectedContactKey) {
-          await refreshContactMessages('Refreshing contact after new traffic...');
+          await refreshContactMessages('Updating selected conversation...');
+        } else {
+          setStatus('New direct message traffic is waiting.');
         }
       });
       liveEventSource.addEventListener('advert-sent', event => {
@@ -1749,7 +1750,7 @@ HTML_PAGE = """<!doctype html>
         return;
       }
       if (action === 'refresh') {
-        refreshModel();
+        refreshModel('Refreshing node state and rescanning channels...', true);
         return;
       }
       if (action === 'channels') {
@@ -1791,10 +1792,10 @@ HTML_PAGE = """<!doctype html>
       }
     }
 
-    async function refreshModel(statusText = 'Refreshing node state...') {
+    async function refreshModel(statusText = 'Refreshing node state...', refreshChannels = false) {
       setStatus(statusText);
       try {
-        const payload = await callApi('/api/node-page');
+        const payload = await callApi(`/api/node-page${refreshChannels ? '?refresh_channels=1' : ''}`);
         render(payload.node_page);
         await refreshGatewayAccess();
         if (selectedContactKey !== null) {
@@ -1978,7 +1979,6 @@ HTML_PAGE = """<!doctype html>
         const payload = await callApi(`/api/contacts/${selectedContactKey}/messages`, 'POST', { text });
         document.getElementById('contact-message-input').value = '';
         renderContactMessages(payload.messages || []);
-        await refreshModel('Refreshing contact activity...');
         setStatus('Direct message sent.');
       } catch (error) {
         setStatus(String(error));
@@ -2069,11 +2069,11 @@ HTML_PAGE = """<!doctype html>
     document.getElementById('action-tools-contact-code').addEventListener('click', showContactCode);
     document.getElementById('action-tools-import-contact').addEventListener('click', () => addContact('code'));
     document.getElementById('action-tools-discover').addEventListener('click', discoverContacts);
-    document.getElementById('action-tools-refresh-node').addEventListener('click', () => refreshModel('Refreshing node state...'));
+    document.getElementById('action-tools-refresh-node').addEventListener('click', () => refreshModel('Refreshing node state and rescanning channels...', true));
     document.getElementById('action-tools-reboot').addEventListener('click', rebootDevice);
     document.getElementById('clear-tool-output').addEventListener('click', clearToolOutput);
 
-    document.getElementById('refresh').addEventListener('click', () => refreshModel());
+    document.getElementById('refresh').addEventListener('click', () => refreshModel('Refreshing node state and rescanning channels...', true));
     document.getElementById('save-settings').addEventListener('click', saveAllSettings);
     document.getElementById('save-gateway-access').addEventListener('click', saveGatewayAccess);
     document.getElementById('reboot-device').addEventListener('click', rebootDevice);
@@ -2194,7 +2194,9 @@ def launch_web_app(
                     self._stream_events()
                     return
                 if request_path == "/api/node-page":
-                    self._send_json(session_broker.collect_node_page())
+                    query = parse_qs(urlparse(self.path).query)
+                    refresh_channels = (query.get("refresh_channels") or [""])[0].strip().lower() in {"1", "true", "yes"}
+                    self._send_json(session_broker.collect_node_page(refresh_channels=refresh_channels))
                     return
                 if request_path == "/api/actions/export-contact-code":
                     self._send_json(session_broker.export_contact_code())

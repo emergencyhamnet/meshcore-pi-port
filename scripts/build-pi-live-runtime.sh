@@ -115,7 +115,6 @@ for relative_source in "${sources[@]}" "${c_sources[@]}"; do
 	require_file "$repo_root/$relative_source"
 done
 
-mkdir -p "$storage_root/identity" "$storage_root/state" "$storage_root/channels" "$storage_root/logs"
 mkdir -p "$build_dir" "$(dirname "$runtime_bin")"
 
 cpp_objects=()

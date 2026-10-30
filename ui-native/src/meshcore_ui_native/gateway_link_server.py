@@ -147,6 +147,8 @@ class GatewayLinkBroker(Protocol):
 
     def set_tx_power(self, tx_power_dbm: int) -> dict[str, Any]: ...
 
+    def discover_contacts(self, body: dict[str, Any]) -> dict[str, Any]: ...
+
 
 @dataclass(frozen=True, slots=True)
 class GatewayLinkConfig:
@@ -286,6 +288,8 @@ class GatewayLinkService:
             return self.send_channel_message(params)
         if method == "set_tx_power":
             return self.set_tx_power(params)
+        if method == "send_zero_hop_advert":
+            return self.send_zero_hop_advert()
         raise ValueError(f"Unsupported gateway-link method {method!r}.")
 
     def get_snapshot(self) -> dict[str, Any]:
@@ -334,6 +338,7 @@ class GatewayLinkService:
                 "source_kind": "native-session-broker",
                 "interface_mode": "gateway-link",
                 "gateway_tx_allowed": allow_basestation_tx,
+                "zero_hop_advert_supported": callable(getattr(self._broker, "discover_contacts", None)),
                 "transport_ready": True,
                 "runtime_endpoint": f"tcp://{self._config.native_host}:{self._config.native_port}",
                 "link_carrier": "tcp",
@@ -539,6 +544,17 @@ class GatewayLinkService:
             "accepted": accepted,
             "message": "Channel message accepted by MeshCore gateway link; on-air delivery is not independently confirmed." if accepted else "Channel message rejected by MeshCore gateway link.",
             "payload": record,
+        }
+
+    def send_zero_hop_advert(self) -> dict[str, Any]:
+        if not self.current_allow_basestation_tx():
+            raise ValueError("Basestation-directed transmit is disabled for this gateway-link server.")
+        result = self._broker.discover_contacts({"flood": False})
+        accepted = bool(result.get("ok"))
+        return {
+            "accepted": accepted,
+            "message": "Zero-hop advert accepted by the local node; reception is not confirmed." if accepted else "Zero-hop advert was not confirmed; no automatic retry.",
+            "payload": {"advert_type": "zero_hop", "flood": False, "sent_at": result.get("sent_at")},
         }
 
     def set_tx_power(self, params: dict[str, Any]) -> dict[str, Any]:

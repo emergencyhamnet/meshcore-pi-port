@@ -123,21 +123,20 @@ void close_transport_handle(int& fd) {
     }
 }
 
+// Returns false only when the peer closed or the read failed; "no data yet" is still connected.
 bool read_available_bytes(int fd, std::vector<std::uint8_t>& dest) {
     std::uint8_t buffer[256];
-    bool read_any = false;
     while (true) {
         const auto count = read(fd, buffer, sizeof(buffer));
         if (count > 0) {
             dest.insert(dest.end(), buffer, buffer + count);
-            read_any = true;
             continue;
         }
         if (count == 0) {
-            return read_any;
+            return false;
         }
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return read_any;
+            return true;
         }
         return false;
     }

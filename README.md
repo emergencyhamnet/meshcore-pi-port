@@ -4,11 +4,14 @@ Standalone Raspberry Pi HAT port of MeshCore, built to run a complete MeshCore n
 
 ## Quick Start
 
-If you want to build and run the current Pi alpha on supported hardware, start here:
+For the operating-mode overview and current documentation map, start with
+[Current Pi-Port Documentation](./docs/current/README.md). The port serves two related use cases:
+standalone MeshCore operation with companion-app compatibility, and use as an EHN basestation
+gateway. The Pi-hosted browser UI is documented as a shared operator surface.
 
-1. `docs/pi_hat_pinout.md` for supported radio-family and wiring assumptions
-2. `docs/pi_install_build_release.md` for prerequisites, build, install, validation, and release packaging
-3. `docs/pi_alpha_release.md` for alpha scope and release contract
+For supported hardware, build/install instructions and the alpha scope, use the
+[current documentation index](./docs/current/README.md). Check each document's status before
+treating candidate or draft instructions as a released installation recipe.
 
 ## Status
 
@@ -38,8 +41,8 @@ This means the current port is built for a Pi HAT style radio design in the same
 
 See:
 
-1. [docs/pi_hat_pinout.md](./docs/pi_hat_pinout.md)
-2. [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md)
+1. [Current Pi HAT hardware and connector specification](./docs/current/pi_hat_hardware_spec.md)
+2. [Radio pinout summary](./docs/current/pi_hat_pinout.md)
 
 ## What This Port Provides
 
@@ -53,6 +56,7 @@ Included surfaces:
 4. app-mode companion bridge on `127.0.0.1:5040`
 5. optional local browser UI for status and logs
 6. static telemetry snapshot support for standalone testing
+7. optional standalone HAT sensor sampler, installed separately and disabled by default
 
 ## Interface Model
 
@@ -73,8 +77,8 @@ This keeps the runtime-owned native companion path, the Pi-hosted browser UI, an
 
 For more detail, see:
 
-1. [docs/PI_BROWSER_UI_MOVE_PLAN.md](./docs/PI_BROWSER_UI_MOVE_PLAN.md) for the service layout and live deployment notes
-2. [docs/pi_alpha_release.md](./docs/pi_alpha_release.md)
+1. [Pi-port UI guide](./docs/current/pi-port/pi-ui.md)
+2. [Alpha scope](./docs/current/pi_alpha_release.md)
 
 ## Relationship To The EHN Basestation
 
@@ -86,7 +90,9 @@ and specifications are in `ehn-docs`.
 
 ## Telemetry
 
-The Pi runtime can expose battery and environmental telemetry from a simple key-value snapshot file.
+The Pi runtime can expose battery and environmental telemetry from a timestamped key-value
+snapshot. For the optional standalone I2C sampler, disabled-by-default service and native
+permission boundary, see [Standalone Pi HAT Sensor Telemetry](./docs/current/pi-port/telemetry.md).
 
 Primary environment variables:
 
@@ -103,15 +109,15 @@ python3 scripts/write-dummy-telemetry-snapshot.py
 
 For a practical install, build, validation, and release flow, use:
 
-1. [docs/pi_install_build_release.md](./docs/pi_install_build_release.md)
+1. [Current Pi-port install/build guide](./docs/current/pi_install_build_release.md)
 
 For alpha scope and release-contract notes, see:
 
-1. [docs/pi_alpha_release.md](./docs/pi_alpha_release.md)
+1. [Current alpha scope and release contract](./docs/current/pi_alpha_release.md)
 
 For detailed bring-up and radio validation guidance, see:
 
-1. [docs/PI_NATIVE_BRINGUP.md](./docs/PI_NATIVE_BRINGUP.md)
+1. [Archived native bring-up notes](./docs/archive/PI_NATIVE_BRINGUP.md), for history only
 
 ## Current Limitations
 

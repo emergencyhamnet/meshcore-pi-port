@@ -15,11 +15,12 @@ Included in scope:
 3. Pi storage layout and persisted donor state
 4. optional local browser UI for status and logs
 5. dummy telemetry snapshot support
+6. optional standalone HAT sensor sampler, installed separately and disabled by default
 
 Explicitly out of scope:
 
 1. basestation repository integration
-2. real sensor ownership
+2. automatic periodic telemetry broadcasts, sensor alarms, or hardware controls
 3. browser-helper send and receive workflows as the primary interface
 4. packaging the Pi as a full appliance image
 
@@ -31,7 +32,11 @@ Default behavior:
 
 1. `MESHCORE_PI_INTERFACE_MODE=app`
 2. published MeshCore app is the main interactive control surface
-3. telemetry may come from a static snapshot file
+3. telemetry may come from a static snapshot file; a separate optional sampler may provide
+	live HAT values but does not change native telemetry permissions or broadcast by itself
+
+See [Standalone Pi HAT Sensor Telemetry](pi-port/telemetry.md) for the optional sampler and
+native request/reply permission boundary. The release service defaults do not enable it.
 
 ## App-Mode Quickstart
 
@@ -106,6 +111,12 @@ To create a dummy snapshot for alpha testing:
 python3 scripts/write-dummy-telemetry-snapshot.py
 ```
 
+For opt-in HAT sensor acquisition in standalone-node mode, use
+[Standalone Pi HAT Sensor Telemetry](./pi-port/telemetry.md). The sampler is a separate
+service; install it disabled by default. Native `base`/`environment` telemetry permissions
+remain independent operator settings, and RF request/reply validation is a separate acceptance
+step.
+
 ## Minimum Source Release Contents
 
 Release these source surfaces together:
@@ -120,6 +131,7 @@ Release these source surfaces together:
 8. `docs/PI_NATIVE_BRINGUP.md`
 9. `docs/WINDOWS_NATIVE_UI_RESET.md`
 10. `docs/pi_alpha_release.md`
+11. `docs/pi-port/`
 
 ## Minimum Validation Before Tagging
 
