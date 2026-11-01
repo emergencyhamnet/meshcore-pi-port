@@ -188,7 +188,7 @@ def main() -> int:
                     cwd=repo_root(),
                     env=runtime_env(args, runtime_endpoint),
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stderr=None if os.environ.get("MESHCORE_PI_TRACE_TX_POWER") == "1" else subprocess.DEVNULL,
                     preexec_fn=os.setsid,
                 )
                 runtime_sock, _ = runtime_listener.accept()

@@ -197,7 +197,9 @@ class NativeSessionBroker:
     def apply_settings(self, body: dict[str, Any]) -> dict[str, Any]:
         def operation(client: MeshCoreNativeTcpClient) -> dict[str, Any]:
             client.set_advert_name(str(body.get("name") or ""))
-            client.set_device_time(int(body["timestamp"]))
+            timestamp = int(body["timestamp"])
+            if timestamp > client.get_device_time():
+                client.set_device_time(timestamp)
             client.set_advert_location(float(body["lat"]), float(body["lon"]))
             client.set_radio_params(
                 freq_mhz=float(body["freq_mhz"]),

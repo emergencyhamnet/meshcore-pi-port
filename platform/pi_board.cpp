@@ -33,12 +33,6 @@ const BoardProfile& board_profile() {
 bool board_bootstrap() {
     const auto& profile = board_profile();
 
-    if (!gpio_configure_output(profile.radio.nss, true)) {
-        return false;
-    }
-    if (!gpio_configure_input(profile.radio.dio1)) {
-        return false;
-    }
     if (!gpio_configure_output(profile.radio.reset, true)) {
         return false;
     }
@@ -64,7 +58,7 @@ bool board_set_radio_path_mode(RadioPathMode mode) {
     case RadioPathMode::receive:
         return gpio_write(profile.radio.txen, false) && gpio_write(profile.radio.rxen, true);
     case RadioPathMode::transmit:
-        return gpio_write(profile.radio.txen, true) && gpio_write(profile.radio.rxen, false);
+        return gpio_write(profile.radio.rxen, false) && gpio_write(profile.radio.txen, true);
     }
 
     return false;

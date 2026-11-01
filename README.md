@@ -17,6 +17,10 @@ treating candidate or draft instructions as a released installation recipe.
 
 This repository currently represents an early standalone alpha of the Pi port.
 
+Use [v0.2.0-alpha5](./docs/current/pi_alpha_release_v0.2.0-alpha5.md) for the E22 GPIO,
+power-control and settings-save corrections. Existing installations must rebuild and restart;
+the older alpha4 tag does not contain these fixes.
+
 Current goals:
 
 1. run a real MeshCore node on a Raspberry Pi

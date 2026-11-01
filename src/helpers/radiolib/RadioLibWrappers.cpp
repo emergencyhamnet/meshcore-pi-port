@@ -4,6 +4,10 @@
 
 #include <algorithm>
 
+#ifdef MESHCORE_PI_TRACE_TX_POWER
+#include <cstdio>
+#endif
+
 #define STATE_IDLE       0
 #define STATE_RX         1
 #define STATE_TX_WAIT    3
@@ -49,7 +53,14 @@ uint32_t RadioLibWrapper::getRngSeed() {
 }
 
 void RadioLibWrapper::setTxPower(int8_t dbm) {
+#ifdef MESHCORE_PI_TRACE_TX_POWER
+  std::fprintf(stderr, "PiPowerTrace: requested_dbm=%d\n", static_cast<int>(dbm));
+  const int16_t result = _radio->setOutputPower(dbm);
+  std::fprintf(stderr, "PiPowerTrace: requested_dbm=%d radiolib_result=%d\n",
+               static_cast<int>(dbm), static_cast<int>(result));
+#else
   _radio->setOutputPower(dbm);
+#endif
 }
 
 void RadioLibWrapper::idle() {

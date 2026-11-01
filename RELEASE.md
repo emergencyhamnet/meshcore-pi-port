@@ -8,8 +8,8 @@ The Raspberry Pi HAT port currently uses a manual release flow rather than the f
 
 Current standalone Pi alpha release notes live in:
 
-1. `docs/pi_alpha_release.md` for scope, install, and packaging guidance
-2. `docs/pi_alpha_release_v0.1.0-alpha1.md` for the `v0.1.0-alpha1` GitHub release body
+1. [Pi alpha scope](docs/current/pi_alpha_release.md) for scope and packaging guidance
+2. [Alpha5 release notes](docs/current/pi_alpha_release_v0.2.0-alpha5.md) for the current release body and upgrade steps
 
 For Pi alpha releases:
 

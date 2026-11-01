@@ -19,7 +19,7 @@ defines=(
 	-DMESHCORE_PI_BOARD_OWNS_RF_SWITCH
 	-DSX126X_TXEN=22
 	-DSX126X_RXEN=27
-	-DSX126X_DIO2_AS_RF_SWITCH=true
+	-DSX126X_DIO2_AS_RF_SWITCH=false
 	-DSX126X_DIO3_TCXO_VOLTAGE=1.8
 	-DSX126X_CURRENT_LIMIT=140
 	-DFIRMWARE_VER_CODE=13
@@ -29,14 +29,17 @@ defines=(
 	-DLORA_BW=62.5
 	-DLORA_SF=7
 	-DLORA_CR=5
-	# Keep the chip-drive ceiling at 17 dBm for the Pi HAT build; field measurements
-	# showed about 30 dBm output at the test port at this setting, which is already
-	# near the module's practical advertised maximum once PA gain and coax loss are included.
-	-DLORA_TX_POWER=17
+	# Precautionary E22-900M33S drive limit from upstream FAQ; verify manufacturer guidance.
+	-DLORA_TX_POWER=9
+	-DMAX_LORA_TX_POWER=9
 	-DMAX_CONTACTS=100
 	-DMAX_GROUP_CHANNELS=15
 	-DOFFLINE_QUEUE_SIZE=16
 )
+
+if [[ "${MESHCORE_PI_TRACE_TX_POWER:-0}" == "1" ]]; then
+	defines+=(-DMESHCORE_PI_TRACE_TX_POWER)
+fi
 
 includes=(
 	-I.

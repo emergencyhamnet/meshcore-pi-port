@@ -62,6 +62,49 @@ acceptance checklist in `pi-port/standalone.md`:
 - Root-owned state backup (`/var/lib/meshcore-pi-port`: identity, channels/contacts, prefs,
   state) created and content-verified.
 
+## Post-Alpha4 RF Correction, 2026-10-31
+
+This correction was made after the `v0.2.0-alpha4` tag and is **not included in that tag**.
+It is included in [alpha5](pi_alpha_release_v0.2.0-alpha5.md), which supersedes alpha4.
+
+### Required Public Release Follow-Up
+
+Before calling this issue fixed for public GitHub users, commit and publish the Pi GPIO
+implementation, the Pi-only DIO2 configuration correction, and the related standalone UI
+wording update. Validate a clean checkout using only the documented install/build steps. The
+published source or binary package must enable the E22 PA without users manually editing GPIO
+code or build flags; document any upgrade/rebuild step needed to replace an already installed
+runtime.
+
+- Root cause of the low RF output: `platform/pi_gpio.cpp` only updated an in-memory pin
+	simulator. The Pi board's TX callbacks therefore did not drive physical GPIO22/TXEN and
+	GPIO27/RXEN, leaving the E22 external PA path disabled. This was a Pi platform-layer issue,
+	not a basestation application issue.
+- Replaced the simulator with `lgpio`-backed GPIO operations, initialized GPIO before board
+	pin setup, and routed the radio HAL's reset, BUSY, TXEN and RXEN calls through the shared
+	board GPIO owner. The initial change removed the DIO2 build define; subsequent tracing
+	found RadioLib enables DIO2 by default. Alpha5 explicitly sets it to false. Chip drive
+	was initially +17 dBm and was subsequently reduced as described below; it was not raised to 33.
+- Rebuilt and deployed `/opt/meshcore-pi-port/bin/pi-live-runtime`; the standalone
+	`meshcore-pi-live-runtime.service` restarted and reported `live_radio_ready=1` and
+	`live_runtime_ready=1`.
+- Operator reports advert bursts exceeding 32 dBm on spectrum-analyzer peak hold with a fast
+	sweep. This is an indicative peak-hold observation, not a calibrated total conducted-power
+	result; analyzer settings and sweep details were not recorded.
+- The Pi runtime fix applies to RF transmissions from both the standalone UI/client path and
+	any basestation client using that runtime. Basestation-originated TX remains independently
+	blocked by the browser UI gateway-link access setting until an operator enables it.
+
+### Precautionary Drive Limit, 2026-11-01
+
+The Pi runtime default and maximum SX1262 drive are now explicitly +9 dBm, and the
+radio-smoke build default is also +9 dBm. This follows the upstream FAQ's E22-900M33S
+warning pending independent verification against the fitted module's manufacturer guidance.
+The earlier +17 dBm setting and peak-hold observation do not establish a safe drive limit.
+On restart, the companion runtime clamps any saved higher TX setting to +9 dBm; new TX
+requests above +9 dBm are rejected. Rebuild and restart are required for existing installs.
+This change is also required in the next public release, not the existing alpha4 tag.
+
 ## Explicit limitations
 
 - The companion bridge serves **one client at a time**. The Pi browser UI holds the

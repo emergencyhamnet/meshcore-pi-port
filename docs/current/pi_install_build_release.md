@@ -106,10 +106,10 @@ That early failure is intentional so packaging and release builds do not silentl
 ## Clone And Prepare
 
 To work from GitHub source directly, clone the verified alpha tag. Earlier alpha tags (`v0.2.0-alpha1`, `v0.2.0-alpha2`, `v0.1.0-alpha1`) do not build from a clean clone.
-The next candidate release notes are in `docs/pi_alpha_release_v0.2.0-alpha4.md`; use the candidate commit only after its fresh-clone validation is complete.
+Use [alpha5 release notes](pi_alpha_release_v0.2.0-alpha5.md) for RF corrections and existing-node upgrade instructions. Alpha4 does not contain the GPIO or settings-save corrections.
 
 ```bash
-sudo git clone --branch v0.2.0-alpha4 https://github.com/emergencyhamnet/meshcore-pi-port.git /opt/meshcore-pi-port
+sudo git clone --branch v0.2.0-alpha5 https://github.com/emergencyhamnet/meshcore-pi-port.git /opt/meshcore-pi-port
 sudo chown -R "$USER":"$USER" /opt/meshcore-pi-port
 cd /opt/meshcore-pi-port
 ```
@@ -119,8 +119,8 @@ cd /opt/meshcore-pi-port
 To work from a source release archive instead:
 
 ```bash
-tar -xzf meshcore-pi-port-v0.2.0-alpha4-source.tar.gz
-cd meshcore-pi-port-v0.2.0-alpha4-source
+tar -xzf meshcore-pi-port-v0.2.0-alpha5-source.tar.gz
+cd meshcore-pi-port-v0.2.0-alpha5-source
 ```
 
 Optional but useful for standalone validation:
@@ -161,10 +161,11 @@ Important defaults baked into the current Pi alpha build:
 1. `MESHCORE_PI_LIVE_RADIO`
 2. `SX126X_TXEN=22`
 3. `SX126X_RXEN=27`
-4. `SX126X_DIO2_AS_RF_SWITCH=true`
+4. `SX126X_DIO2_AS_RF_SWITCH=false`
 5. `SX126X_DIO3_TCXO_VOLTAGE=1.8`
 6. `SX126X_CURRENT_LIMIT=140`
-7. `LORA_TX_POWER=17`
+7. `LORA_TX_POWER=9`
+8. `MAX_LORA_TX_POWER=9` (chip drive, not antenna-port output)
 
 ## Install The Runtime Service
 
@@ -282,7 +283,7 @@ Record every step where you had to deviate from this document; that list is the 
 ### Build and install
 
 1. Install the build dependencies and `RadioLib` as described above.
-2. Clone `v0.2.0-alpha4` into `/opt/meshcore-pi-port`.
+2. Clone `v0.2.0-alpha5` into `/opt/meshcore-pi-port`.
 3. Run `scripts/build-pi-live-runtime.sh`. Expect roughly 2 to 5 minutes and zero `error` lines. On a Pi 3B+ this took 2m14s.
 4. Install the runtime service in `app` mode, then the browser UI service with `MESHCORE_PI_BROWSER_UI_GATEWAY_LINK_ALLOW_TX=1`.
 5. Do not run any radio smoke test while another node with the same identity is on the air; a fresh node has a fresh identity, so this is only a concern if state was copied.
@@ -311,22 +312,22 @@ Running the original node behind the original basestation profile and the new no
 To generate a source release archive:
 
 ```bash
-scripts/package-pi-alpha-release.sh v0.2.0-alpha4
+scripts/package-pi-alpha-release.sh v0.2.0-alpha5
 ```
 
 Artifacts are written to `dist/` by default.
 
 Generated outputs:
 
-1. `meshcore-pi-port-v0.2.0-alpha4-source.tar.gz`
-2. `meshcore-pi-port-v0.2.0-alpha4-pi-binary.tar.gz` if `bin/pi-live-runtime` already exists and is executable
+1. `meshcore-pi-port-v0.2.0-alpha5-source.tar.gz`
+2. `meshcore-pi-port-v0.2.0-alpha5-pi-binary.tar.gz` if `bin/pi-live-runtime` already exists and is executable
 
 Recommended release build sequence on the Pi host:
 
 ```bash
 python3 scripts/write-dummy-telemetry-snapshot.py
 scripts/build-pi-live-runtime.sh
-scripts/package-pi-alpha-release.sh v0.2.0-alpha4
+scripts/package-pi-alpha-release.sh v0.2.0-alpha5
 ```
 
 ## Release Checklist
@@ -345,9 +346,9 @@ Before publishing a Pi alpha release:
 Suggested publish sequence:
 
 ```bash
-git tag v0.2.0-alpha4
+git tag v0.2.0-alpha5
 git push origin pi-port-main
-git push origin v0.2.0-alpha4
+git push origin v0.2.0-alpha5
 ```
 
 Then use:

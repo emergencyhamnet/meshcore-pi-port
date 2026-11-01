@@ -24,13 +24,13 @@ std::string runtime_endpoint_from_env() {
 RuntimeBootState boot_runtime_state() {
     RuntimeBootState state{};
 
-    state.board_ready = board_bootstrap();
-    if (!state.board_ready) {
+    state.gpio_ready = gpio_init();
+    if (!state.gpio_ready) {
         return state;
     }
 
-    state.gpio_ready = gpio_init();
-    if (!state.gpio_ready) {
+    state.board_ready = board_bootstrap();
+    if (!state.board_ready) {
         return state;
     }
 

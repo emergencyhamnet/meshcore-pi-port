@@ -941,17 +941,18 @@ HTML_PAGE = """<!doctype html>
       checkbox.checked = Boolean(access.gateway_tx_allowed);
       renderKv('gateway-access-settings', [
         ['Mode', access.gateway_access_mode || 'unknown'],
-        ['Current TX', access.gateway_tx_allowed ? 'Allowed' : 'Blocked'],
-        ['Default TX', access.default_gateway_tx_allowed ? 'Allowed' : 'Blocked'],
+        ['Basestation TX', access.gateway_tx_allowed ? 'Allowed' : 'Blocked'],
+        ['TX after restart', access.default_gateway_tx_allowed ? 'Allowed' : 'Blocked'],
         ['Gateway link', access.link_endpoint || 'Unavailable'],
         ['Runtime target', access.runtime_endpoint || 'Unavailable'],
       ]);
-      note.textContent = access.persistence_note || 'Applies to the running browser UI process.';
+      const persistenceNote = access.persistence_note || 'Applies to the running browser UI process.';
+      note.textContent = `Controls basestation-originated sends through this gateway link only. The Pi's local UI and radio reception are unaffected. ${persistenceNote}`;
       if (access.gateway_tx_allowed) {
-        statusPill.textContent = 'Gateway connected, TX enabled';
+        statusPill.textContent = 'Gateway listener active; remote TX allowed';
         statusPill.className = 'status-pill ok';
       } else {
-        statusPill.textContent = 'Gateway connected, TX disabled';
+        statusPill.textContent = 'Gateway listener active; remote TX blocked';
         statusPill.className = 'status-pill warn';
       }
     }
@@ -1130,6 +1131,8 @@ HTML_PAGE = """<!doctype html>
       document.getElementById('scope-location').textContent = formatLocation(model.identity.advert_lat, model.identity.advert_lon);
       document.getElementById('custom-vars').textContent = Object.keys(model.custom_vars || {}).length ? Object.keys(model.custom_vars).join(', ') : 'None';
       document.getElementById('tx-power').value = model.radio.tx_power_dbm;
+      document.getElementById('tx-power').min = '-9';
+      document.getElementById('tx-power').max = String(model.radio.max_tx_power_dbm);
       document.getElementById('repeat-mode').checked = Boolean(model.capabilities.client_repeat);
       document.getElementById('max-tx').textContent = `${model.radio.max_tx_power_dbm} dBm`;
       document.getElementById('frequency').textContent = `${Number(model.radio.freq_mhz).toFixed(3)} MHz`;
@@ -1838,6 +1841,10 @@ HTML_PAGE = """<!doctype html>
         throw new Error('Advert location must use numeric latitude and longitude values.');
       }
       const option = document.getElementById('radio-preset').selectedOptions[0];
+      const txPower = Number(document.getElementById('tx-power').value.trim());
+      if (!Number.isInteger(txPower) || txPower < -9 || txPower > currentModel.radio.max_tx_power_dbm) {
+        throw new Error(`TX power must be a whole number from -9 to ${currentModel.radio.max_tx_power_dbm} dBm.`);
+      }
       return {
         name: document.getElementById('node-name').value.trim(),
         timestamp: Math.floor(date.getTime() / 1000),
@@ -1848,7 +1855,7 @@ HTML_PAGE = """<!doctype html>
         sf: Number(option.dataset.sf),
         cr: Number(option.dataset.cr),
         repeat: document.getElementById('repeat-mode').checked,
-        tx_power_dbm: Number(document.getElementById('tx-power').value.trim()),
+        tx_power_dbm: txPower,
       };
     }
 

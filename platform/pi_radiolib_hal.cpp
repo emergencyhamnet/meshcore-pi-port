@@ -15,8 +15,9 @@ bool is_hardware_spi_chip_select(std::uint32_t pin) {
     return pin == board_profile().radio.nss;
 }
 
-bool is_board_rf_switch_pin(std::uint32_t pin) {
-    return pin == board_profile().radio.txen || pin == board_profile().radio.rxen;
+bool is_board_managed_gpio(std::uint32_t pin) {
+    const auto& radio = board_profile().radio;
+    return pin == radio.txen || pin == radio.rxen || pin == radio.reset || pin == radio.busy;
 }
 
 } // namespace
@@ -79,7 +80,7 @@ void PiRadioLibHal::pinMode(std::uint32_t pin, std::uint32_t mode) {
         return;
     }
 
-    if (is_board_rf_switch_pin(pin)) {
+    if (is_board_managed_gpio(pin)) {
         bool configured = false;
         if (mode == GpioModeInput) {
             configured = gpio_configure_input(static_cast<std::uint8_t>(pin));
@@ -142,7 +143,7 @@ void PiRadioLibHal::digitalWrite(std::uint32_t pin, std::uint32_t value) {
         return;
     }
 
-    if (is_board_rf_switch_pin(pin)) {
+    if (is_board_managed_gpio(pin)) {
         if (!pin_claimed_[pin]) {
             pinMode(pin, GpioModeOutput);
             if (!pin_claimed_[pin]) {
@@ -172,7 +173,7 @@ std::uint32_t PiRadioLibHal::digitalRead(std::uint32_t pin) {
         return 0;
     }
 
-    if (is_board_rf_switch_pin(pin)) {
+    if (is_board_managed_gpio(pin)) {
         bool value = false;
         if (!pin_claimed_[pin]) {
             pinMode(pin, GpioModeInput);
@@ -317,11 +318,32 @@ void PiRadioLibHal::spiTransfer(std::uint8_t* out, std::size_t len, std::uint8_t
         return;
     }
 
+#ifdef MESHCORE_PI_TRACE_TX_POWER
+    const bool trace_power = len > 0 && (out[0] == 0x95 || out[0] == 0x8E);
+    if (trace_power) {
+        std::fprintf(stderr, "PiPowerTrace: SPI TX");
+        for (std::size_t index = 0; index < len; ++index) {
+            std::fprintf(stderr, " %02X", static_cast<unsigned int>(out[index]));
+        }
+        std::fprintf(stderr, "\n");
+    }
+#endif
     const int result = lgSpiXfer(
         spi_handle_,
         reinterpret_cast<char*>(out),
         reinterpret_cast<char*>(in),
         static_cast<std::uint32_t>(len));
+#ifdef MESHCORE_PI_TRACE_TX_POWER
+    if (trace_power) {
+        std::fprintf(stderr, "PiPowerTrace: SPI transferred=%d expected=%zu RX", result, len);
+        if (result > 0) {
+            for (std::size_t index = 0; index < len && index < static_cast<std::size_t>(result); ++index) {
+                std::fprintf(stderr, " %02X", static_cast<unsigned int>(in[index]));
+            }
+        }
+        std::fprintf(stderr, "\n");
+    }
+#endif
     if (result < 0) {
         report_error("SPI transfer", result);
     }

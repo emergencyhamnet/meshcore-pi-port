@@ -37,37 +37,8 @@ copy_file() {
 
 pushd "$repo_root" >/dev/null
 
-for path in \
-	README.md \
-	RELEASE.md \
-	license.txt \
-	main \
-	platform \
-	src \
-	ui-native \
-	examples/companion_radio \
-	include \
-	lib/ed25519 \
-	scripts \
-	deploy/systemd \
-	test \
-	docs/PI_NATIVE_BRINGUP.md \
-	docs/PI_BROWSER_UI_MOVE_PLAN.md \
-	docs/pi-port \
-	docs/pi_hat_pinout.md \
-	docs/pi_install_build_release.md \
-	docs/pi_alpha_release_v0.2.0-alpha4.md \
-		docs/UPSTREAM_SYNC.md \
-		docs/PORTING_RULES.md \
-	docs/pi_alpha_release.md; do
-	if [[ -d "$path" ]]; then
-		copy_tree "$path" "$source_root/$path"
-	else
-		copy_file "$path" "$source_root/$path"
-	fi
-	done
-
-	tar -czf "$output_dir/meshcore-pi-port-$release_name-source.tar.gz" -C "$output_dir" "$(basename "$source_root")"
+git archive --format=tar.gz --prefix="$(basename "$source_root")/" \
+	-o "$output_dir/meshcore-pi-port-$release_name-source.tar.gz" HEAD
 
 	if [[ -x "$runtime_bin" ]]; then
 		for path in \
@@ -78,7 +49,7 @@ for path in \
 			scripts/install-pi-live-runtime-service.sh \
 			scripts/pi_hat_sensor_sampler.py \
 			scripts/install-pi-hat-sensors-service.sh \
-			docs/pi-port/telemetry.md \
+			docs/current/pi-port/telemetry.md \
 			scripts/run-pi-gateway-link.sh \
 			scripts/install-pi-gateway-link-service.sh \
 			scripts/run-pi-browser-ui.sh \
@@ -89,15 +60,8 @@ for path in \
 			deploy/systemd/meshcore-pi-hat-sensors.service \
 			deploy/systemd/meshcore-pi-gateway-link.service \
 			deploy/systemd/meshcore-pi-browser-ui.service \
-			docs/pi_alpha_release.md \
-			docs/pi_alpha_release_v0.2.0-alpha4.md \
-			docs/PI_NATIVE_BRINGUP.md \
-			docs/PI_BROWSER_UI_MOVE_PLAN.md \
-			docs/pi-port \
-			docs/pi_hat_pinout.md \
-			docs/pi_install_build_release.md \
-			docs/UPSTREAM_SYNC.md \
-			docs/PORTING_RULES.md; do
+			docs/current \
+			docs/archive; do
 			if [[ -d "$path" ]]; then
 				copy_tree "$path" "$binary_root/$path"
 			else

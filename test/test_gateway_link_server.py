@@ -120,6 +120,32 @@ class FakeBroker:
 
 
 class NativeBrokerSendTests(unittest.TestCase):
+    def test_settings_save_reaches_tx_power_with_stale_displayed_time(self) -> None:
+        for timestamp in (99, 100, 101):
+            with self.subTest(timestamp=timestamp):
+                client = SimpleNamespace(
+                    set_advert_name=Mock(),
+                    get_device_time=Mock(return_value=100),
+                    set_device_time=Mock(),
+                    set_advert_location=Mock(),
+                    set_radio_params=Mock(),
+                    set_radio_tx_power=Mock(),
+                )
+                broker = NativeSessionBroker({}, {}, {})
+                body = {
+                    "name": "test", "timestamp": timestamp, "lat": 0, "lon": 0,
+                    "freq_mhz": 910.525, "bw_khz": 62.5, "sf": 7, "cr": 5,
+                    "repeat": False, "tx_power_dbm": -9,
+                }
+                with patch.object(broker, "_execute", side_effect=lambda operation: operation(client)):
+                    result = broker.apply_settings(body)
+                self.assertTrue(result["ok"])
+                client.set_radio_tx_power.assert_called_once_with(-9)
+                if timestamp > 100:
+                    client.set_device_time.assert_called_once_with(timestamp)
+                else:
+                    client.set_device_time.assert_not_called()
+
     def test_advert_refreshes_cached_contacts_on_next_snapshot(self) -> None:
         key = "9b4994708df9" + "ab" * 26
         reads = []

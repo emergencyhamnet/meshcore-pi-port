@@ -48,11 +48,11 @@ int main() {
     pi_port::PiDonorRuntimeBridge bridge;
     const auto& bridge_state = bridge.start();
 
-    if (!bridge_state.adapter.boot.board_ready) {
-        return 1;
-    }
     if (!bridge_state.adapter.boot.gpio_ready) {
         return 2;
+    }
+    if (!bridge_state.adapter.boot.board_ready) {
+        return 1;
     }
     if (!bridge_state.adapter.boot.spi_ready) {
         return 3;
