@@ -20,6 +20,8 @@ Supersedes alpha4 for the Raspberry Pi HAT. The alpha4 tag is unchanged.
 - Source packaging uses the committed Git tree, including root compatibility headers.
 - Optional power tracing is off by default. It logs RadioLib status and PA/power SPI
   commands only when explicitly enabled; it does not change radio parameters.
+- Corrected the sampler test's Linux permission check to run before its temporary directory
+  is removed. Local validation passes 32 Pi tests and 25 native UI tests.
 
 ## RF Evidence
 

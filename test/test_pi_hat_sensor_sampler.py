@@ -50,6 +50,8 @@ class PiHatSensorSamplerTests(unittest.TestCase):
             SAMPLER.write_snapshot(path, snapshot)
 
             fields = dict(line.split('=', 1) for line in path.read_text(encoding='utf-8').splitlines())
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
         self.assertEqual(fields, {
             'timestamp_unix': '1793275200',
@@ -58,9 +60,6 @@ class PiHatSensorSamplerTests(unittest.TestCase):
             'pressure_hpa': '1011.2000',
             'vbat_v': '4.1000',
         })
-        if os.name != 'nt':
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-
     def test_zero_voltage_is_preserved_and_bool_or_nonfinite_values_are_omitted(self):
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / 'snapshot.env'
